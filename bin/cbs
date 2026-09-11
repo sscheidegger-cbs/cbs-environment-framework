@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+CBS_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CBS_ROOT="$(cd "$CBS_BIN_DIR/.." && pwd)"
+VERSION_FILE="$CBS_ROOT/VERSION"
+
+print_help() {
+    printf "%s\n" \
+        "CBS Environment Framework" \
+        "" \
+        "Usage:" \
+        "  cbs" \
+        "  cbs help" \
+        "  cbs --help" \
+        "  cbs -h" \
+        "  cbs version" \
+        "  cbs --version" \
+        "" \
+        "Commands:" \
+        "  help       Display this help." \
+        "  version    Display the CBS Environment Framework version."
+}
+
+print_version() {
+    if [[ ! -f "$VERSION_FILE" ]]; then
+        echo "CBS_ERROR=VERSION_FILE_NOT_FOUND" >&2
+        return 3
+    fi
+
+    version="$(tr -d "\r\n" < "$VERSION_FILE")"
+
+    if [[ -z "$version" ]]; then
+        echo "CBS_ERROR=VERSION_EMPTY" >&2
+        return 3
+    fi
+
+    printf "CBS_FRAMEWORK_VERSION=%s\n" "$version"
+}
+
+main() {
+    command="${1:-help}"
+
+    case "$command" in
+        help|--help|-h)
+            print_help
+            ;;
+        version|--version)
+            print_version
+            ;;
+        *)
+            echo "CBS_ERROR=UNKNOWN_COMMAND" >&2
+            printf "CBS_COMMAND=%s\n" "$command" >&2
+            echo "Run \"cbs help\" for usage." >&2
+            return 2
+            ;;
+    esac
+}
+
+main "$@"
