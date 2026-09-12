@@ -74,3 +74,35 @@ A missing context argument is rejected with exit code 2.
 ## Current limits
 
 No workspace, repository lifecycle, worktree, stack, instance, runtime or deployment management command is implemented yet.
+
+## Workstation
+
+Qualified command:
+
+```text
+cbs workstation check <context-file>
+```
+
+The command:
+
+- validates workstation prerequisites;
+- observes Docker isolation state for the supplied context;
+- aggregates the result through the Workstation Manager;
+- does not install, start, stop, remove or reconfigure workstation resources.
+
+Qualified aggregate states:
+
+```text
+READY
+INCOMPLETE
+CONFLICT
+UNKNOWN
+```
+
+For the qualified Core Platform context:
+
+```text
+cbs workstation check config/contexts/core-platform.local.env
+```
+
+The observed qualified state is READY with return code 0.
