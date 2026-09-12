@@ -5,6 +5,8 @@ set -Eeuo pipefail
 CBS_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CBS_ROOT="$(cd "$CBS_BIN_DIR/.." && pwd)"
 VERSION_FILE="$CBS_ROOT/VERSION"
+CONTEXT_LIB="$CBS_ROOT/cbs/context/context.sh"
+GIT_OBSERVER_LIB="$CBS_ROOT/cbs/context/git_observer.sh"
 
 print_help() {
     printf "%s\n" \
@@ -17,10 +19,12 @@ print_help() {
         "  cbs -h" \
         "  cbs version" \
         "  cbs --version" \
+        "  cbs status <context-file>" \
         "" \
         "Commands:" \
         "  help       Display this help." \
-        "  version    Display the CBS Environment Framework version."
+        "  version    Display the CBS Environment Framework version." \
+        "  status     Display configured and observed context status."
 }
 
 print_version() {
@@ -39,6 +43,48 @@ print_version() {
     printf "CBS_FRAMEWORK_VERSION=%s\n" "$version"
 }
 
+print_status() {
+    local context_file="${1:-}"
+
+    if [[ -z "$context_file" ]]; then
+        echo "CBS_ERROR=CONTEXT_FILE_REQUIRED" >&2
+        return 2
+    fi
+
+    [[ -f "$CONTEXT_LIB" ]] || {
+        echo "CBS_ERROR=CONTEXT_LIBRARY_NOT_FOUND" >&2
+        return 3
+    }
+
+    [[ -f "$GIT_OBSERVER_LIB" ]] || {
+        echo "CBS_ERROR=GIT_OBSERVER_LIBRARY_NOT_FOUND" >&2
+        return 3
+    }
+
+    source "$CONTEXT_LIB"
+    source "$GIT_OBSERVER_LIB"
+
+    cbs_context_load "$context_file" || return $?
+    cbs_git_observe_and_compare || return $?
+
+    printf 'CBS_CONTEXT_CLIENT=%s\n' "$CBS_CONTEXT_CLIENT"
+    printf 'CBS_CONTEXT_ENTITY_TYPE=%s\n' "$CBS_CONTEXT_ENTITY_TYPE"
+    printf 'CBS_CONTEXT_ENTITY_NAME=%s\n' "$CBS_CONTEXT_ENTITY_NAME"
+    printf 'CBS_CONTEXT_ENVIRONMENT=%s\n' "$CBS_CONTEXT_ENVIRONMENT"
+
+    printf 'CBS_CONTEXT_REPOSITORY_PATH=%s\n' "$CBS_CONTEXT_REPOSITORY_PATH"
+    printf 'CBS_OBSERVED_REPOSITORY_PATH=%s\n' "$CBS_OBSERVED_REPOSITORY_PATH"
+
+    printf 'CBS_CONTEXT_BRANCH=%s\n' "$CBS_CONTEXT_BRANCH"
+    printf 'CBS_OBSERVED_BRANCH=%s\n' "$CBS_OBSERVED_BRANCH"
+
+    printf 'CBS_OBSERVED_HEAD=%s\n' "$CBS_OBSERVED_HEAD"
+
+    printf 'CBS_CONTEXT_DRIFT=%s\n' "$CBS_CONTEXT_DRIFT"
+    printf 'CBS_CONTEXT_DRIFT_REPOSITORY_PATH=%s\n' "$CBS_CONTEXT_DRIFT_REPOSITORY_PATH"
+    printf 'CBS_CONTEXT_DRIFT_BRANCH=%s\n' "$CBS_CONTEXT_DRIFT_BRANCH"
+}
+
 main() {
     command="${1:-help}"
 
@@ -48,6 +94,10 @@ main() {
             ;;
         version|--version)
             print_version
+            ;;
+        status)
+            shift
+            print_status "${1:-}"
             ;;
         *)
             echo "CBS_ERROR=UNKNOWN_COMMAND" >&2

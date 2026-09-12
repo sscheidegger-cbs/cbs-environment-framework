@@ -42,7 +42,7 @@ set -e
 grep -Fq "CBS_ERROR=UNKNOWN_COMMAND" <<<"$UNKNOWN_OUTPUT" || fail "UNKNOWN_COMMAND_ERROR_MISSING"
 grep -Fq "CBS_COMMAND=does-not-exist" <<<"$UNKNOWN_OUTPUT" || fail "UNKNOWN_COMMAND_VALUE_MISSING"
 
-for forbidden in setup start stop deploy release rollback status; do
+for forbidden in setup start stop deploy release rollback; do
     if grep -Eq "(^|[[:space:]])${forbidden}([[:space:]]|$)" <<<"$HELP"; then
         fail "UNIMPLEMENTED_COMMAND_ADVERTISED_${forbidden}"
     fi
