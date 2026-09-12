@@ -8,6 +8,9 @@ VERSION_FILE="$CBS_ROOT/VERSION"
 CONTEXT_LIB="$CBS_ROOT/cbs/context/context.sh"
 GIT_OBSERVER_LIB="$CBS_ROOT/cbs/context/git_observer.sh"
 WORKSTATION_MANAGER="$CBS_ROOT/cbs/workstation/workstation_manager.sh"
+WORKSPACE_OBSERVER="$CBS_ROOT/cbs/workspace/workspace_observer.sh"
+WORKSPACE_MANAGER="$CBS_ROOT/cbs/workspace/workspace_manager.sh"
+REPOSITORY_MANAGER="$CBS_ROOT/cbs/workspace/repository_manager.sh"
 
 print_help() {
     printf "%s\n" \
@@ -22,6 +25,9 @@ print_help() {
         "  cbs --version" \
         "  cbs status <context-file>" \
         "  cbs workstation check <context-file>" \
+        "  cbs workspace check <workspace-path> <repository-path> <origin>" \
+        "  cbs workspace ensure <workspace-path>" \
+        "  cbs repository ensure <repository-path> <origin>" \
         "" \
         "Commands:" \
         "  help        Display this help." \
@@ -102,6 +108,44 @@ main() {
             shift
             print_status "${1:-}"
             ;;
+        workspace)
+            shift
+            subcommand="${1:-}"
+
+            case "$subcommand" in
+                check)
+                    shift
+                    "$WORKSPACE_OBSERVER"                         "${1:-}"                         "${2:-}"                         "${3:-}"
+                    ;;
+                ensure)
+                    shift
+                    "$WORKSPACE_MANAGER" "${1:-}"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_WORKSPACE_COMMAND" >&2
+                    echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
+        repository)
+            shift
+            subcommand="${1:-}"
+
+            case "$subcommand" in
+                ensure)
+                    shift
+                    "$REPOSITORY_MANAGER"                         "${1:-}"                         "${2:-}"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_REPOSITORY_COMMAND" >&2
+                    echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
         workstation)
             shift
 

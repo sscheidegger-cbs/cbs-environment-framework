@@ -106,3 +106,32 @@ cbs workstation check config/contexts/core-platform.local.env
 ```
 
 The observed qualified state is READY with return code 0.
+
+## Workspace / Repository
+
+Qualified commands:
+
+```text
+cbs workspace check <workspace-path> <repository-path> <origin>
+cbs workspace ensure <workspace-path>
+cbs repository ensure <repository-path> <origin>
+```
+
+Qualified lifecycle behavior:
+
+```text
+Workspace READY -> REUSE
+Workspace MISSING -> CREATE if direct parent exists
+Workspace INVALID -> BLOCK
+
+Repository READY -> REUSE
+Repository MISSING -> CLONE
+Repository NOT_GIT -> BLOCK
+Repository REMOTE_MISMATCH -> BLOCK
+```
+
+The workspace check command is read-only.
+
+The ensure commands do not perform implicit checkout, reset, clean, remote repair or worktree manipulation.
+
+For the qualified Core Platform repository, repository ensure performs REUSE and preserves the existing dirty worktree.

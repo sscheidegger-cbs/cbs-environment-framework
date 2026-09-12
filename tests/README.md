@@ -153,3 +153,88 @@ Validates:
 The B17b-B tests do not qualify automatic prerequisite installation, workspace/repository/worktree management, stack resolution, instance management, automatic port allocation, runtime lifecycle or deployment.
 
 Automatic conflict discovery from future stack or instance specifications is not implemented in B17b-B.
+
+## B17b-C Workspace / Repository test suite
+
+Qualified executable tests:
+
+```text
+tests/test_workspace_contract.sh
+tests/test_repository_contract.sh
+tests/test_workspace_observer.sh
+tests/test_repository_mutation_gate.sh
+tests/test_repository_manager.sh
+tests/test_workspace_manager.sh
+tests/test_workspace_cli.sh
+```
+
+### Workspace contract
+
+Validates path classification, Workspace states and return codes.
+
+### Repository contract
+
+Validates repository states, worktree cleanliness observation and return codes.
+
+A DIRTY worktree is explicitly validated as non-blocking when repository identity and origin remain coherent.
+
+### Workspace observer
+
+Validates read-only observation of the real Workspace and Core Platform repository.
+
+### Repository mutation gate
+
+Validates the policy:
+
+```text
+MISSING -> candidate for CLONE
+NOT_GIT -> BLOCK
+REMOTE_MISMATCH -> BLOCK
+READY -> REUSE
+```
+
+### Repository Manager
+
+Validates:
+
+- clone of a missing repository using a temporary local Git source;
+- reuse of a compliant repository;
+- blocking of a non-Git target;
+- blocking of remote mismatch;
+- preservation of incompatible existing state.
+
+### Workspace Manager
+
+Validates:
+
+- creation of a missing Workspace when its direct parent exists;
+- reuse of an existing Workspace;
+- blocking of invalid targets;
+- absence of recursive parent creation.
+
+### Workspace / Repository CLI
+
+Validates:
+
+- cbs workspace check <workspace-path> <repository-path> <origin>;
+- cbs workspace ensure <workspace-path>;
+- cbs repository ensure <repository-path> <origin>;
+- unknown Workspace and Repository subcommands.
+
+### Real-state qualification
+
+The real Workspace / Core Platform qualification validates:
+
+```text
+CBS_WORKSPACE_STATE=READY
+CBS_REPOSITORY_STATE=READY
+CBS_REPOSITORY_WORKTREE_STATE=DIRTY
+REAL_WORKSPACE_MUTATION=NONE
+REAL_REPOSITORY_MUTATION=NONE
+```
+
+### Qualification boundary
+
+B17b-C tests do not qualify worktree lifecycle, branch creation, checkout, reset, clean, remote repair, stack resolution, instance lifecycle, Docker runtime lifecycle, deployment or release management.
+
+Worktree lifecycle belongs to B17b-D.
