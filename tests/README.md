@@ -58,9 +58,7 @@ test_status.sh validates:
 
 ## Current qualification boundary
 
-The tests cover only capabilities implemented in B17b-A.
-
-Workspace, repository lifecycle, worktrees, stacks, instances, runtime, deployment and infrastructure management are not covered because they are not implemented yet.
+This section describes the B17b-A test boundary. Additional qualified test suites for B17b-B and subsequent units are documented below.
 
 ## B17b-B Workstation test suite
 
@@ -351,3 +349,134 @@ cbs stack prerequisites <manifest>
 ### Qualification boundary
 
 B17b-E does not qualify automatic prerequisite installation, runtime lifecycle, local-instance lifecycle, deployment or release management.
+
+## B17b-F Local Instance test suite
+
+Qualified executable tests:
+
+```text
+tests/test_instance_contract.sh
+tests/test_core_platform_instance_manifest.sh
+tests/test_instance_observer.sh
+tests/test_instance_mutation_gate.sh
+tests/test_instance_manager.sh
+tests/test_instance_cli.sh
+```
+
+### Instance contract
+
+Validates:
+
+```text
+instance states
+resource types
+resource states
+actions
+state/action mapping
+return codes
+source idempotence
+```
+
+### Core Platform instance manifest
+
+Validates:
+
+```text
+instance identity
+6 declared containers
+1 declared network
+1 declared external volume
+fixed-resource constraints
+```
+
+### Instance observer
+
+Validates read-only observation and aggregation of the resources declared by the instance manifest.
+
+The qualified real observation is:
+
+```text
+CBS_INSTANCE_EXPECTED_RESOURCE_COUNT=8
+CBS_INSTANCE_AVAILABLE_RESOURCE_COUNT=0
+CBS_INSTANCE_CONFLICT_RESOURCE_COUNT=0
+CBS_INSTANCE_STATE=READY
+CBS_INSTANCE_ACTION=REUSE
+CBS_INSTANCE_OBSERVATION_RESULT=PASS
+```
+
+READY means that the resources declared by the manifest were found as expected.
+
+It does not qualify container execution state or runtime health.
+
+### Instance mutation gate
+
+Validates the decision policy:
+
+```text
+READY -> REUSE
+STOPPED -> REUSE
+PARTIAL -> OBSERVE
+CONFLICT -> BLOCK
+INVALID -> BLOCK
+UNKNOWN -> OBSERVE
+```
+
+The mutation gate performs no Docker mutation.
+
+### Instance manager
+
+Validates safe reuse of the existing qualified Core Platform local instance.
+
+Qualified real result:
+
+```text
+CBS_INSTANCE_MANAGER_STATE_BEFORE=READY
+CBS_INSTANCE_MANAGER_ACTION=REUSE
+CBS_INSTANCE_MANAGER_MUTATION=NONE
+CBS_INSTANCE_MANAGER_RESULT=PASS
+```
+
+### Instance CLI
+
+Validates:
+
+```text
+cbs instance check <manifest>
+cbs instance ensure <manifest>
+unknown instance command rejection
+missing manifest handling
+help exposure
+```
+
+### Core Platform constraints
+
+The qualification established:
+
+```text
+FIXED_CONTAINER_NAMES
+FIXED_NETWORK_NAME
+FIXED_EXTERNAL_VOLUME
+FIXED_HOST_PORTS
+```
+
+### Qualification boundary
+
+B17b-F does not qualify:
+
+```text
+independent instance creation
+multi-instance runtime coexistence
+dynamic resource allocation
+runtime lifecycle
+runtime health
+deployment
+release management
+```
+
+Qualified boundary:
+
+```text
+MULTI_INSTANCE_COEXISTENCE=NOT_QUALIFIED
+INSTANCE_CREATE=NOT_IMPLEMENTED
+RUNTIME_HEALTH=NOT_QUALIFIED
+```

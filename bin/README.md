@@ -73,7 +73,7 @@ A missing context argument is rejected with exit code 2.
 
 ## Current limits
 
-No workspace, repository lifecycle, worktree, stack, instance, runtime or deployment management command is implemented yet.
+Runtime lifecycle, independent instance creation and deployment management are not implemented yet.
 
 ## Workstation
 
@@ -183,3 +183,30 @@ prerequisites -> evaluate REQUIRED manifest prerequisites against workstation ob
 Both commands are read-only.
 
 The Stack CLI does not install or upgrade prerequisites and does not start runtime components.
+
+## Instance
+
+Qualified commands:
+
+```text
+cbs instance check <manifest>
+cbs instance ensure <manifest>
+```
+
+Qualified real behavior for the current Core Platform local instance:
+
+```text
+REAL_INSTANCE_STATE=READY
+REAL_INSTANCE_ACTION=REUSE
+REAL_INSTANCE_MUTATION=NONE
+```
+
+`instance check` performs read-only resource observation.
+
+`instance ensure` currently qualifies safe reuse of the existing instance.
+
+It does not create an independent instance and does not start, stop, restart, remove or reconfigure Docker resources.
+
+In B17b-F, READY means that all resources declared by the instance manifest were found as expected.
+
+READY does not qualify runtime or container health.

@@ -15,6 +15,8 @@ WORKTREE_OBSERVER="$CBS_ROOT/cbs/worktree/worktree_observer.sh"
 WORKTREE_MANAGER="$CBS_ROOT/cbs/worktree/worktree_manager.sh"
 STACK_RESOLVER="$CBS_ROOT/cbs/stack/stack_resolver.sh"
 STACK_PREREQUISITE_EVALUATOR="$CBS_ROOT/cbs/stack/stack_prerequisite_evaluator.sh"
+INSTANCE_OBSERVER="$CBS_ROOT/cbs/instance/instance_observer.sh"
+INSTANCE_MANAGER="$CBS_ROOT/cbs/instance/instance_manager.sh"
 
 print_help() {
     printf "%s\n" \
@@ -36,6 +38,8 @@ print_help() {
         "  cbs worktree ensure <repository-path> <worktree-path> <branch>" \
         "  cbs stack resolve <manifest>" \
         "  cbs stack prerequisites <manifest>" \
+        "  cbs instance check <manifest>" \
+        "  cbs instance ensure <manifest>" \
         "" \
         "Commands:" \
         "  help        Display this help." \
@@ -237,6 +241,39 @@ main() {
                     ;;
                 *)
                     echo "CBS_ERROR=UNKNOWN_STACK_COMMAND" >&2
+                    echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
+        instance)
+            shift
+            subcommand="${1:-}"
+
+            case "$subcommand" in
+                check)
+                    shift
+
+                    if [[ ! -x "$INSTANCE_OBSERVER" ]]; then
+                        echo "CBS_ERROR=INSTANCE_OBSERVER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$INSTANCE_OBSERVER" "${1:-}"
+                    ;;
+                ensure)
+                    shift
+
+                    if [[ ! -x "$INSTANCE_MANAGER" ]]; then
+                        echo "CBS_ERROR=INSTANCE_MANAGER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$INSTANCE_MANAGER" "${1:-}"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_INSTANCE_COMMAND" >&2
                     echo "CBS_COMMAND=${subcommand}" >&2
                     return 2
                     ;;
