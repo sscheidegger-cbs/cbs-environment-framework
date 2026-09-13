@@ -480,3 +480,21 @@ MULTI_INSTANCE_COEXISTENCE=NOT_QUALIFIED
 INSTANCE_CREATE=NOT_IMPLEMENTED
 RUNTIME_HEALTH=NOT_QUALIFIED
 ```
+
+## B17b-G Platform Binding
+
+Qualified tests:
+
+```text
+tests/test_platform_contract.sh
+tests/test_core_platform_binding_manifest.sh
+tests/test_platform_resolver.sh
+tests/test_platform_hook_runner.sh
+tests/test_platform_cli.sh
+```
+
+The real Core Platform LOCAL binding was also qualified through CBS for resolve, status, check, qualify, stop and start.
+
+The canonical Core local regression completed 15/15 PASS.
+
+Multi-instance runtime coexistence, independent instance creation, dynamic resource allocation, remote deployment and release management remain outside the B17b-G qualification boundary.

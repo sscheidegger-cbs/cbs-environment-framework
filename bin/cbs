@@ -17,6 +17,8 @@ STACK_RESOLVER="$CBS_ROOT/cbs/stack/stack_resolver.sh"
 STACK_PREREQUISITE_EVALUATOR="$CBS_ROOT/cbs/stack/stack_prerequisite_evaluator.sh"
 INSTANCE_OBSERVER="$CBS_ROOT/cbs/instance/instance_observer.sh"
 INSTANCE_MANAGER="$CBS_ROOT/cbs/instance/instance_manager.sh"
+PLATFORM_RESOLVER="$CBS_ROOT/cbs/platform/platform_resolver.sh"
+PLATFORM_HOOK_RUNNER="$CBS_ROOT/cbs/platform/platform_hook_runner.sh"
 
 print_help() {
     printf "%s\n" \
@@ -40,6 +42,12 @@ print_help() {
         "  cbs stack prerequisites <manifest>" \
         "  cbs instance check <manifest>" \
         "  cbs instance ensure <manifest>" \
+        "  cbs platform resolve <manifest>" \
+        "  cbs platform start <manifest>" \
+        "  cbs platform check <manifest>" \
+        "  cbs platform status <manifest>" \
+        "  cbs platform stop <manifest>" \
+        "  cbs platform qualify <manifest>" \
         "" \
         "Commands:" \
         "  help        Display this help." \
@@ -274,6 +282,40 @@ main() {
                     ;;
                 *)
                     echo "CBS_ERROR=UNKNOWN_INSTANCE_COMMAND" >&2
+                    echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
+        platform)
+            shift
+            subcommand="${1:-}"
+
+            case "$subcommand" in
+                resolve)
+                    shift
+
+                    if [[ ! -x "$PLATFORM_RESOLVER" ]]; then
+                        echo "CBS_ERROR=PLATFORM_RESOLVER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$PLATFORM_RESOLVER" "${1:-}"
+                    ;;
+                start|check|status|stop|qualify)
+                    action="$subcommand"
+                    shift
+
+                    if [[ ! -x "$PLATFORM_HOOK_RUNNER" ]]; then
+                        echo "CBS_ERROR=PLATFORM_HOOK_RUNNER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$PLATFORM_HOOK_RUNNER" "${1:-}" "$action"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_PLATFORM_COMMAND" >&2
                     echo "CBS_COMMAND=${subcommand}" >&2
                     return 2
                     ;;

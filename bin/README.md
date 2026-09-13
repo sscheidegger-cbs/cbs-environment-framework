@@ -210,3 +210,20 @@ It does not create an independent instance and does not start, stop, restart, re
 In B17b-F, READY means that all resources declared by the instance manifest were found as expected.
 
 READY does not qualify runtime or container health.
+
+## Platform
+
+Qualified commands:
+
+```text
+cbs platform resolve <manifest>
+cbs platform start <manifest>
+cbs platform check <manifest>
+cbs platform status <manifest>
+cbs platform stop <manifest>
+cbs platform qualify <manifest>
+```
+
+The Core Platform LOCAL binding delegates these actions to the existing Core lifecycle scripts.
+
+Independent instance creation, multi-instance runtime coexistence, remote deployment and release management are not qualified by B17b-G.

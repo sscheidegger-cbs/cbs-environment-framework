@@ -43,8 +43,8 @@ grep -Fq "CBS_ERROR=UNKNOWN_COMMAND" <<<"$UNKNOWN_OUTPUT" || fail "UNKNOWN_COMMA
 grep -Fq "CBS_COMMAND=does-not-exist" <<<"$UNKNOWN_OUTPUT" || fail "UNKNOWN_COMMAND_VALUE_MISSING"
 
 for forbidden in setup start stop deploy release rollback; do
-    if grep -Eq "(^|[[:space:]])${forbidden}([[:space:]]|$)" <<<"$HELP"; then
-        fail "UNIMPLEMENTED_COMMAND_ADVERTISED_${forbidden}"
+    if grep -Eq "^[[:space:]]+cbs[[:space:]]+${forbidden}([[:space:]]|$)" <<<"$HELP"; then
+        fail "UNIMPLEMENTED_TOP_LEVEL_COMMAND_ADVERTISED_${forbidden}"
     fi
 done
 
