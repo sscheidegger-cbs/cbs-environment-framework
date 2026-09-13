@@ -135,3 +135,31 @@ The workspace check command is read-only.
 The ensure commands do not perform implicit checkout, reset, clean, remote repair or worktree manipulation.
 
 For the qualified Core Platform repository, repository ensure performs REUSE and preserves the existing dirty worktree.
+
+## Worktree
+
+Qualified commands:
+
+```text
+cbs worktree check <repository-path>
+cbs worktree ensure <repository-path> <worktree-path> <branch>
+```
+
+Qualified behavior:
+
+```text
+READY -> REUSE
+MISSING -> CREATE
+BRANCH_CONFLICT -> BLOCK
+PATH_CONFLICT -> BLOCK
+INVALID_REPOSITORY -> BLOCK
+UNKNOWN -> BLOCK
+```
+
+The check command is read-only.
+
+The ensure command does not perform implicit reset, clean, branch deletion or worktree deletion.
+
+B17b-D qualifies Git worktree coexistence for develop, release and hotfix.
+
+It does not qualify runtime instance coexistence.

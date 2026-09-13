@@ -238,3 +238,66 @@ REAL_REPOSITORY_MUTATION=NONE
 B17b-C tests do not qualify worktree lifecycle, branch creation, checkout, reset, clean, remote repair, stack resolution, instance lifecycle, Docker runtime lifecycle, deployment or release management.
 
 Worktree lifecycle belongs to B17b-D.
+
+## B17b-D Worktree test suite
+
+Qualified executable tests:
+
+```text
+tests/test_worktree_contract.sh
+tests/test_worktree_observer.sh
+tests/test_worktree_mutation_gate.sh
+tests/test_worktree_manager.sh
+tests/test_worktree_coexistence.sh
+tests/test_worktree_cli.sh
+```
+
+### Worktree contract
+
+Validates Worktree states, branch attachment states, actions and return codes.
+
+### Worktree observer
+
+Validates read-only observation of the real Core Platform worktrees.
+
+The qualified real observation contains:
+
+```text
+3 worktrees
+1 ATTACHED worktree
+2 DETACHED worktrees
+3 DIRTY worktrees
+```
+
+### Mutation gate
+
+Validates pure decision behavior for REUSE, CREATE and BLOCK cases.
+
+### Worktree Manager
+
+Validates CREATE, REUSE, branch conflict, path conflict, missing parent and missing branch behavior on a temporary Git fixture.
+
+### Worktree coexistence
+
+Validates simultaneous Git worktree coexistence for:
+
+```text
+develop
+release
+hotfix
+```
+
+The controlled fixture contains four worktrees in total, including the primary repository worktree.
+
+### Worktree CLI
+
+Validates:
+
+```text
+cbs worktree check <repository-path>
+cbs worktree ensure <repository-path> <worktree-path> <branch>
+```
+
+### Qualification boundary
+
+B17b-D does not qualify runtime instance lifecycle or multi-instance runtime isolation.

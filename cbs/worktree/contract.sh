@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+if [[ "${CBS_WORKTREE_CONTRACT_LOADED:-0}" == "1" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
+
+CBS_WORKTREE_CONTRACT_LOADED=1
+readonly CBS_WORKTREE_CONTRACT_LOADED
+
+CBS_WORKTREE_CONTRACT_VERSION=1
+
+readonly CBS_WORKTREE_CONTRACT_VERSION
+
+readonly CBS_WORKTREE_STATE_READY="READY"
+readonly CBS_WORKTREE_STATE_MISSING="MISSING"
+readonly CBS_WORKTREE_STATE_BRANCH_CONFLICT="BRANCH_CONFLICT"
+readonly CBS_WORKTREE_STATE_PATH_CONFLICT="PATH_CONFLICT"
+readonly CBS_WORKTREE_STATE_INVALID_REPOSITORY="INVALID_REPOSITORY"
+readonly CBS_WORKTREE_STATE_UNKNOWN="UNKNOWN"
+
+readonly CBS_WORKTREE_BRANCH_ATTACHED="ATTACHED"
+readonly CBS_WORKTREE_BRANCH_DETACHED="DETACHED"
+readonly CBS_WORKTREE_BRANCH_ABSENT="ABSENT"
+readonly CBS_WORKTREE_BRANCH_UNKNOWN="UNKNOWN"
+
+readonly CBS_WORKTREE_ACTION_REUSE="REUSE"
+readonly CBS_WORKTREE_ACTION_CREATE="CREATE"
+readonly CBS_WORKTREE_ACTION_BLOCK="BLOCK"
+
+readonly CBS_RC_WORKTREE_BRANCH_CONFLICT=60
+readonly CBS_RC_WORKTREE_PATH_CONFLICT=61
+readonly CBS_RC_WORKTREE_INVALID_REPOSITORY=62
+readonly CBS_RC_WORKTREE_UNKNOWN=63
+readonly CBS_RC_WORKTREE_USAGE=64
+
+cbs_worktree_state_is_valid() {
+    case "${1:-}" in
+        "$CBS_WORKTREE_STATE_READY"|"$CBS_WORKTREE_STATE_MISSING"|"$CBS_WORKTREE_STATE_BRANCH_CONFLICT"|"$CBS_WORKTREE_STATE_PATH_CONFLICT"|"$CBS_WORKTREE_STATE_INVALID_REPOSITORY"|"$CBS_WORKTREE_STATE_UNKNOWN")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+cbs_worktree_branch_state_is_valid() {
+    case "${1:-}" in
+        "$CBS_WORKTREE_BRANCH_ATTACHED"|"$CBS_WORKTREE_BRANCH_DETACHED"|"$CBS_WORKTREE_BRANCH_ABSENT"|"$CBS_WORKTREE_BRANCH_UNKNOWN")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+cbs_worktree_action_for_state() {
+    case "${1:-}" in
+        "$CBS_WORKTREE_STATE_READY")
+            printf '%s\n' "$CBS_WORKTREE_ACTION_REUSE"
+            ;;
+        "$CBS_WORKTREE_STATE_MISSING")
+            printf '%s\n' "$CBS_WORKTREE_ACTION_CREATE"
+            ;;
+        "$CBS_WORKTREE_STATE_BRANCH_CONFLICT"|"$CBS_WORKTREE_STATE_PATH_CONFLICT"|"$CBS_WORKTREE_STATE_INVALID_REPOSITORY"|"$CBS_WORKTREE_STATE_UNKNOWN")
+            printf '%s\n' "$CBS_WORKTREE_ACTION_BLOCK"
+            ;;
+        *)
+            return "$CBS_RC_WORKTREE_UNKNOWN"
+            ;;
+    esac
+}

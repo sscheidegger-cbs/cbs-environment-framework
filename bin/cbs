@@ -11,6 +11,8 @@ WORKSTATION_MANAGER="$CBS_ROOT/cbs/workstation/workstation_manager.sh"
 WORKSPACE_OBSERVER="$CBS_ROOT/cbs/workspace/workspace_observer.sh"
 WORKSPACE_MANAGER="$CBS_ROOT/cbs/workspace/workspace_manager.sh"
 REPOSITORY_MANAGER="$CBS_ROOT/cbs/workspace/repository_manager.sh"
+WORKTREE_OBSERVER="$CBS_ROOT/cbs/worktree/worktree_observer.sh"
+WORKTREE_MANAGER="$CBS_ROOT/cbs/worktree/worktree_manager.sh"
 
 print_help() {
     printf "%s\n" \
@@ -28,6 +30,8 @@ print_help() {
         "  cbs workspace check <workspace-path> <repository-path> <origin>" \
         "  cbs workspace ensure <workspace-path>" \
         "  cbs repository ensure <repository-path> <origin>" \
+        "  cbs worktree check <repository-path>" \
+        "  cbs worktree ensure <repository-path> <worktree-path> <branch>" \
         "" \
         "Commands:" \
         "  help        Display this help." \
@@ -164,6 +168,39 @@ main() {
                     ;;
                 *)
                     echo "CBS_ERROR=UNKNOWN_WORKSTATION_COMMAND" >&2
+                    echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
+        worktree)
+            shift
+            subcommand="${1:-}"
+
+            case "$subcommand" in
+                check)
+                    shift
+
+                    if [[ ! -x "$WORKTREE_OBSERVER" ]]; then
+                        echo "CBS_ERROR=WORKTREE_OBSERVER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$WORKTREE_OBSERVER" "${1:-}"
+                    ;;
+                ensure)
+                    shift
+
+                    if [[ ! -x "$WORKTREE_MANAGER" ]]; then
+                        echo "CBS_ERROR=WORKTREE_MANAGER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$WORKTREE_MANAGER"                         "${1:-}"                         "${2:-}"                         "${3:-}"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_WORKTREE_COMMAND" >&2
                     echo "CBS_COMMAND=${subcommand}" >&2
                     return 2
                     ;;
