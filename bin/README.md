@@ -163,3 +163,23 @@ The ensure command does not perform implicit reset, clean, branch deletion or wo
 B17b-D qualifies Git worktree coexistence for develop, release and hotfix.
 
 It does not qualify runtime instance coexistence.
+
+## Stack
+
+Qualified commands:
+
+```text
+cbs stack resolve <manifest>
+cbs stack prerequisites <manifest>
+```
+
+Qualified behavior:
+
+```text
+resolve -> validate and expose stack requirements and capabilities
+prerequisites -> evaluate REQUIRED manifest prerequisites against workstation observations
+```
+
+Both commands are read-only.
+
+The Stack CLI does not install or upgrade prerequisites and does not start runtime components.

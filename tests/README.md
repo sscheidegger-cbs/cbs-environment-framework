@@ -301,3 +301,53 @@ cbs worktree ensure <repository-path> <worktree-path> <branch>
 ### Qualification boundary
 
 B17b-D does not qualify runtime instance lifecycle or multi-instance runtime isolation.
+
+## B17b-E Stack test suite
+
+Qualified executable tests:
+
+```text
+tests/test_stack_contract.sh
+tests/test_core_platform_stack_manifest.sh
+tests/test_stack_resolver.sh
+tests/test_stack_prerequisite_evaluator.sh
+tests/test_stack_cli.sh
+```
+
+### Stack contract
+
+Validates contract version, stack states, prerequisite states, component requirements, capabilities, aggregation and return codes.
+
+### Core Platform stack manifest
+
+Validates the Core Platform stack identity, prerequisites, required components and declared capabilities.
+
+### Stack Resolver
+
+Validates manifest resolution, prerequisite/component exposure, capabilities, invalid manifest handling and read-only behavior.
+
+### Stack prerequisite evaluator
+
+Validates mapping of REQUIRED stack prerequisites to Workstation prerequisite observations.
+
+The qualified workstation result is:
+
+```text
+CBS_STACK_PREREQUISITE_REQUIRED_COUNT=5
+CBS_STACK_PREREQUISITE_FAILURE_COUNT=0
+CBS_STACK_STATE=READY
+CBS_STACK_PREREQUISITE_EVALUATION_RESULT=PASS
+```
+
+### Stack CLI
+
+Validates:
+
+```text
+cbs stack resolve <manifest>
+cbs stack prerequisites <manifest>
+```
+
+### Qualification boundary
+
+B17b-E does not qualify automatic prerequisite installation, runtime lifecycle, local-instance lifecycle, deployment or release management.

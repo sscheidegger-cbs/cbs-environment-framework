@@ -13,6 +13,8 @@ WORKSPACE_MANAGER="$CBS_ROOT/cbs/workspace/workspace_manager.sh"
 REPOSITORY_MANAGER="$CBS_ROOT/cbs/workspace/repository_manager.sh"
 WORKTREE_OBSERVER="$CBS_ROOT/cbs/worktree/worktree_observer.sh"
 WORKTREE_MANAGER="$CBS_ROOT/cbs/worktree/worktree_manager.sh"
+STACK_RESOLVER="$CBS_ROOT/cbs/stack/stack_resolver.sh"
+STACK_PREREQUISITE_EVALUATOR="$CBS_ROOT/cbs/stack/stack_prerequisite_evaluator.sh"
 
 print_help() {
     printf "%s\n" \
@@ -32,6 +34,8 @@ print_help() {
         "  cbs repository ensure <repository-path> <origin>" \
         "  cbs worktree check <repository-path>" \
         "  cbs worktree ensure <repository-path> <worktree-path> <branch>" \
+        "  cbs stack resolve <manifest>" \
+        "  cbs stack prerequisites <manifest>" \
         "" \
         "Commands:" \
         "  help        Display this help." \
@@ -206,6 +210,39 @@ main() {
                     ;;
             esac
             ;;
+        stack)
+            shift
+            subcommand="${1:-}"
+
+            case "$subcommand" in
+                resolve)
+                    shift
+
+                    if [[ ! -x "$STACK_RESOLVER" ]]; then
+                        echo "CBS_ERROR=STACK_RESOLVER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$STACK_RESOLVER" "${1:-}"
+                    ;;
+                prerequisites)
+                    shift
+
+                    if [[ ! -x "$STACK_PREREQUISITE_EVALUATOR" ]]; then
+                        echo "CBS_ERROR=STACK_PREREQUISITE_EVALUATOR_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$STACK_PREREQUISITE_EVALUATOR" "${1:-}"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_STACK_COMMAND" >&2
+                    echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
         *)
             echo "CBS_ERROR=UNKNOWN_COMMAND" >&2
             printf "CBS_COMMAND=%s\n" "$command" >&2
