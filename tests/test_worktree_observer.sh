@@ -41,14 +41,24 @@ grep -Fq \
     <<<"$OUTPUT" ||
     fail "SECOND_DETACHED"
 
+grep -Fq \
+    'CBS_WORKTREE_PATH=/home/sscheidegger/projects/core-platform-release' \
+    <<<"$OUTPUT" ||
+    fail "RELEASE_WORKTREE"
+
 DETACHED_COUNT="$(
     grep -Fc 'CBS_WORKTREE_BRANCH_STATE=DETACHED' <<<"$OUTPUT"
 )"
 
-[[ "$DETACHED_COUNT" -ge 2 ]] ||
+[[ "$DETACHED_COUNT" -ge 3 ]] ||
     fail "DETACHED_COUNT"
 
-grep -Fq 'CBS_WORKTREE_COUNT=3' <<<"$OUTPUT" ||
+EXPECTED_WORKTREE_COUNT="$(
+    git -C "$CORE" worktree list --porcelain |
+    grep -c '^worktree '
+)"
+
+grep -Fq "CBS_WORKTREE_COUNT=$EXPECTED_WORKTREE_COUNT" <<<"$OUTPUT" ||
     fail "WORKTREE_COUNT"
 
 grep -Fq 'CBS_WORKTREE_OBSERVATION_RESULT=PASS' <<<"$OUTPUT" ||
