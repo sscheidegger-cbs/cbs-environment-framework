@@ -32,11 +32,13 @@ CBS_CONTEXT_CLIENT=ourea
 CBS_CONTEXT_ENTITY_TYPE=platform
 CBS_CONTEXT_ENTITY_NAME=core-platform
 CBS_CONTEXT_REPOSITORY_PATH=/home/sscheidegger/projects/core-platform
-CBS_CONTEXT_BRANCH=fix/b06-keycloak-kong-e2e
+CBS_CONTEXT_BRANCH=main
 CBS_CONTEXT_ENVIRONMENT=LOCAL
 ```
 
-The configured Core Platform branch is the branch observed during B17b-A qualification. It is not a permanent framework default.
+The versioned Core Platform context tracks the current canonical Core branch `main`.
+
+Historical B17b-A qualification was originally performed on `fix/b06-keycloak-kong-e2e`. That historical qualification evidence is preserved in B17b-A and is not rewritten by this current configuration.
 
 ## Context parser
 

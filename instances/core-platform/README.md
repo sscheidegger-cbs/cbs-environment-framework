@@ -1,6 +1,20 @@
-# Core Platform local instance
+# Core Platform local instance — B17b-F historical baseline
 
-This directory contains the B17b-F manifest for the existing qualified Core Platform local instance.
+## Scope
+
+This directory contains the historical B17b-F Instance v1 manifest used to qualify the Core Platform local instance that existed at that qualification point.
+
+The manifest is intentionally preserved because it is part of the B17b-F qualification baseline and is referenced by the B17b-F test suite.
+
+It must not be interpreted as the current complete Core Platform post-K runtime topology.
+
+Core Platform post-K uses the `ourea-core-local-*` naming model and multiple generation-based persistent volumes.
+
+Instance v1 currently supports only one concrete external-volume field: `CBS_INSTANCE_EXTERNAL_VOLUME`.
+
+Therefore the full post-K Core topology cannot be represented faithfully by this historical manifest without evolving the Instance contract and observer.
+
+No such evolution is performed in D01b-A.
 
 ## Manifest
 

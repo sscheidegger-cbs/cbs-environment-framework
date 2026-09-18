@@ -21,7 +21,7 @@ cbs_context_load "$CONTEXT"
 [[ "$CBS_CONTEXT_ENTITY_TYPE" == "platform" ]] || fail "ENTITY_TYPE"
 [[ "$CBS_CONTEXT_ENTITY_NAME" == "core-platform" ]] || fail "ENTITY_NAME"
 [[ "$CBS_CONTEXT_REPOSITORY_PATH" == "/home/sscheidegger/projects/core-platform" ]] || fail "REPOSITORY_PATH"
-[[ "$CBS_CONTEXT_BRANCH" == "fix/b06-keycloak-kong-e2e" ]] || fail "BRANCH"
+[[ "$CBS_CONTEXT_BRANCH" == "main" ]] || fail "BRANCH"
 [[ "$CBS_CONTEXT_ENVIRONMENT" == "LOCAL" ]] || fail "ENVIRONMENT"
 
 INVALID="$(mktemp)"

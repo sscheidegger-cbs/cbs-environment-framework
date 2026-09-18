@@ -1,10 +1,24 @@
 # Local Instance
 
-B17b-F implements the minimal CBS local-instance observation and safe-reuse layer.
+## Scope
 
-The qualified implementation describes and observes an existing local Core Platform instance.
+This document describes the Instance contract and implementation qualified by B17b-F.
 
-It does not create an independent instance, start or stop runtime services, or modify Docker resources.
+B17b-F implements the minimal CBS local-instance observation and safe-reuse layer for the Core Platform topology that existed at that qualification point.
+
+The historical B17b-F manifest remains preserved as qualification evidence and must not be interpreted as a complete description of the later Core Platform post-K runtime topology.
+
+The current Instance v1 implementation can observe:
+
+- 6 named containers;
+- 1 named network;
+- 1 external volume.
+
+Core Platform post-K uses a richer persistent-resource model with multiple generation-based volumes. That complete topology cannot currently be represented by Instance v1 without evolving the contract and observer.
+
+Such an evolution is outside D01b-A.
+
+The qualified implementation does not create an independent instance, start or stop runtime services, or modify Docker resources.
 
 ## Implemented components
 
