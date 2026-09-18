@@ -498,3 +498,48 @@ The real Core Platform LOCAL binding was also qualified through CBS for resolve,
 The canonical Core local regression completed 15/15 PASS.
 
 Multi-instance runtime coexistence, independent instance creation, dynamic resource allocation, remote deployment and release management remain outside the B17b-G qualification boundary.
+
+## Current portable non-regression boundary
+
+`tests/run_portable_non_regression.sh` is the current portable
+non-regression runner for the CBS Environment Framework.
+
+It executes the framework tests that remain valid against the current
+Core Platform baseline and explicitly excludes tests whose qualification
+assertions depend on the historical B17 real-state environment.
+
+The historical real-state tests currently excluded are:
+
+```text
+tests/test_instance_cli.sh
+tests/test_instance_manager.sh
+tests/test_instance_mutation_gate.sh
+tests/test_isolation_checker.sh
+tests/test_worktree_observer.sh
+```
+
+These tests are preserved as B17 qualification artifacts. Their exclusion
+from the portable runner does not invalidate, rewrite, or replace the
+historical B17 qualification evidence.
+
+The portable runner does not assert that the historical real-state tests
+pass against the current post-K Core Platform runtime.
+
+Current qualified portable result:
+
+```text
+CBS_PORTABLE_NON_REGRESSION_VERSION=1
+CBS_PORTABLE_TEST_PASS_COUNT=34
+CBS_PORTABLE_TEST_FAIL_COUNT=0
+CBS_HISTORICAL_REAL_STATE_TEST_COUNT=5
+CBS_PORTABLE_NON_REGRESSION_RESULT=PASS
+```
+
+This boundary separates:
+
+- portable framework non-regression against the current baseline;
+- historical B17 qualification tests tied to the real state observed at
+  their qualification point.
+
+It does not introduce Instance v2 and does not modify the historical
+B17b-F Instance manifest.
