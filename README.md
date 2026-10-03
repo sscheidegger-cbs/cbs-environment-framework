@@ -105,3 +105,160 @@ The current development version is stored in `VERSION`.
 The repository is still in development and must not be interpreted as a fully
 qualified multi-client, multi-platform, multi-environment CBS product solely
 from the capabilities already demonstrated with Core Platform.
+
+## D01b-B Stack resources and Managed Toolchains
+
+D01b-B extends the historical B17 Stack baseline without rewriting or
+invalidating its qualification evidence.
+
+The Stack layer now classifies declared resources using the following
+transverse resource types:
+
+```text
+SYSTEM_PREREQUISITE
+MANAGED_TOOLCHAIN
+PROJECT_DEPENDENCY
+RUNTIME_COMPONENT
+PLATFORM_CAPABILITY
+```
+
+The generic Stack resolver discovers declared resources without maintaining a
+hardcoded list of technologies.
+
+### Managed Toolchains
+
+A Managed Toolchain is a reusable, versioned development toolchain whose
+physical installation can be managed by CBS independently from a consumer
+project repository.
+
+The current Managed Toolchain lifecycle separates read-only observation from
+explicit mutation:
+
+```text
+DECLARE
+RESOLVE
+OBSERVE
+CLASSIFY
+REUSE or INSTALL
+VERIFY
+```
+
+Existing Stack commands remain read-only:
+
+```text
+cbs stack resolve <manifest>
+cbs stack prerequisites <manifest>
+```
+
+Toolchain mutation is exposed separately and explicitly:
+
+```text
+cbs stack toolchains ensure <manifest>
+```
+
+The Managed Toolchain manager classifies observed installations as:
+
+```text
+MISSING
+PRESENT_COMPATIBLE
+PRESENT_INCOMPATIBLE
+INVALID
+UNKNOWN
+```
+
+and derives one of the following decisions:
+
+```text
+REUSE
+INSTALL
+RECONCILE
+BLOCK
+```
+
+`RECONCILE` is currently an explicit bounded state. Automatic reconciliation
+of an incompatible installed version is not implemented and returns
+`RECONCILE_NOT_IMPLEMENTED`.
+
+### Provider boundary
+
+Technology-specific behavior is isolated behind the Managed Toolchain provider
+boundary.
+
+Provider contract version 1 exposes:
+
+```text
+DETECT
+ENSURE
+VERIFY
+```
+
+`resolve` remains a Toolchain Manager operation; it is not a provider
+operation. Provider detection supplies the observed installation state and
+resolved physical path required by manager resolution.
+
+The generic Stack and Toolchain engines contain no Flutter- or Dart-specific
+branching.
+
+### Flutter reference provider
+
+Flutter is the first real Managed Toolchain provider used to qualify the
+D01b-B architecture.
+
+The qualified Stack declaration currently requests:
+
+```text
+Flutter 3.47.6
+```
+
+Dart is treated as bundled with the Flutter distribution rather than as a
+separate Managed Toolchain.
+
+Managed Flutter installations use a versioned physical layout:
+
+```text
+~/.cbs/toolchains/flutter/<version>
+```
+
+This permits deterministic resolution and supports coexistence of distinct
+toolchain versions without relying on the workstation global `PATH`.
+
+The resolved path is exposed explicitly to the consumer boundary. Full
+project-scoped executable injection into a real consumer project remains part
+of the subsequent consumer qualification rather than being inferred from
+D01b-B.
+
+### Qualification boundary
+
+D01b-B qualifies:
+
+```text
+generic Stack resource classification
+generic Managed Toolchain declarations
+read-only toolchain resolution and observation
+explicit ensure mutation
+versioned physical installation paths
+compatible installation reuse
+post-ensure verification
+controlled provider failures
+explicit incompatible-version reconciliation boundary
+Flutter provider installation and reuse
+Flutter with bundled Dart verification
+preservation of the historical Core Stack behavior
+portable framework non-regression
+```
+
+D01b-B does not by itself prove:
+
+```text
+multi-stack genericity across two heterogeneous qualified consumers
+automatic incompatible-version reconciliation
+generic project dependency installation
+generic runtime component lifecycle
+generic platform capability lifecycle
+remote toolchain lifecycle
+release or deployment orchestration
+```
+
+The next consumer qualification is expected to exercise these transverse
+capabilities from a real project rather than extend the generic engine with
+consumer-specific behavior.

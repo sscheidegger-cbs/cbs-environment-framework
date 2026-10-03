@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EVALUATOR="$ROOT/cbs/stack/stack_toolchain_evaluator.sh"
+
+fail() {
+    echo "TEST_STACK_TOOLCHAIN_EVALUATOR_RESULT=FAIL" >&2
+    echo "TEST_STACK_TOOLCHAIN_EVALUATOR_FAILURE=$1" >&2
+    return 1
+}
+
+[[ -x "$EVALUATOR" ]] ||
+    fail "EVALUATOR_MISSING"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+PROVIDER_DIR="$ROOT/tests/fixtures/providers"
+TOOLCHAIN_ROOT="$TMP/toolchains"
+MANIFEST="$TMP/stack.env"
+
+cat > "$MANIFEST" <<'MANIFEST'
+CBS_STACK_ID=d01bb-toolchain-stack
+CBS_STACK_VERSION=1
+
+CBS_STACK_MANAGED_TOOLCHAIN_IDS=FLUTTER
+
+CBS_STACK_MANAGED_TOOLCHAIN_FLUTTER_REQUIREMENT=REQUIRED
+CBS_STACK_MANAGED_TOOLCHAIN_FLUTTER_VERSION=3.47.6
+CBS_STACK_MANAGED_TOOLCHAIN_FLUTTER_PROVIDER=synthetic
+MANIFEST
+
+printf '%s\n' '--- READ-ONLY EVALUATION ---'
+
+OUTPUT="$(
+    CBS_TOOLCHAIN_PROVIDER_DIR="$PROVIDER_DIR" \
+    CBS_TOOLCHAIN_ROOT="$TOOLCHAIN_ROOT" \
+    "$EVALUATOR" "$MANIFEST"
+)"
+
+grep -Fq \
+    'CBS_STACK_RESOURCE_TYPE=MANAGED_TOOLCHAIN' \
+    <<<"$OUTPUT" ||
+    fail "RESOURCE_TYPE"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_ID=FLUTTER' \
+    <<<"$OUTPUT" ||
+    fail "TOOLCHAIN_ID"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_REQUIREMENT=REQUIRED' \
+    <<<"$OUTPUT" ||
+    fail "REQUIREMENT"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_VERSION=3.47.6' \
+    <<<"$OUTPUT" ||
+    fail "VERSION"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_PROVIDER=synthetic' \
+    <<<"$OUTPUT" ||
+    fail "PROVIDER"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_INSTALLATION_STATE=MISSING' \
+    <<<"$OUTPUT" ||
+    fail "MISSING_STATE"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_DECISION=INSTALL' \
+    <<<"$OUTPUT" ||
+    fail "INSTALL_DECISION"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_MUTATION=NONE' \
+    <<<"$OUTPUT" ||
+    fail "READ_ONLY"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_REQUIRED_COUNT=1' \
+    <<<"$OUTPUT" ||
+    fail "REQUIRED_COUNT"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_MISSING_COUNT=1' \
+    <<<"$OUTPUT" ||
+    fail "MISSING_COUNT"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_EVALUATION_RESULT=PASS' \
+    <<<"$OUTPUT" ||
+    fail "RESULT"
+
+[[ ! -e "$TOOLCHAIN_ROOT/flutter/3.47.6" ]] ||
+    fail "UNEXPECTED_MUTATION"
+
+echo "TEST_STACK_TOOLCHAIN_EVALUATOR_READ_ONLY=PASS"
+
+printf '%s\n' '--- TECHNOLOGY GENERICITY ---'
+
+if grep -qiE 'flutter|dart|python|java|node' "$EVALUATOR"; then
+    fail "TECHNOLOGY_HARDCODING"
+fi
+
+echo "TEST_STACK_TOOLCHAIN_EVALUATOR_GENERIC=PASS"
+
+echo "TEST_STACK_TOOLCHAIN_EVALUATOR_RESULT=PASS"

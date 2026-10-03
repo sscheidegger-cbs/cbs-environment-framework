@@ -5,6 +5,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 source "$ROOT/cbs/stack/contract.sh"
+source "$ROOT/cbs/stack/resource_contract.sh"
 
 cbs_stack_manifest_validate() {
     local manifest="${1:-}"
@@ -43,6 +44,27 @@ cbs_stack_manifest_validate() {
     return 0
 }
 
+cbs_stack_manifest_variable_names() {
+    local manifest="${1:-}"
+    local prefix="${2:-}"
+
+    awk -F= -v prefix="$prefix" '
+        /^[[:space:]]*#/ {
+            next
+        }
+
+        /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/ {
+            name = $1
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+
+            if (index(name, prefix) == 1) {
+                print name
+            }
+        }
+    ' "$manifest" |
+        LC_ALL=C sort -u
+}
+
 cbs_stack_resolve() {
     local manifest="${1:-}"
 
@@ -66,48 +88,88 @@ cbs_stack_resolve() {
     echo "CBS_STACK_VERSION=$CBS_STACK_VERSION"
     echo "CBS_STACK_STATE=$CBS_STACK_STATE_READY"
 
-    printf '%s\n' \
-        CBS_STACK_PREREQUISITE_GIT \
-        CBS_STACK_PREREQUISITE_UV \
-        CBS_STACK_PREREQUISITE_DOCKER \
-        CBS_STACK_PREREQUISITE_DOCKER_COMPOSE \
-        CBS_STACK_PREREQUISITE_PYTHON_312 |
+    local name
+    local value
+
     while IFS= read -r name
     do
+        [[ -n "$name" ]] || continue
+
         value="${!name:-}"
 
+        echo "CBS_STACK_RESOURCE_TYPE=$CBS_STACK_RESOURCE_TYPE_SYSTEM_PREREQUISITE"
         echo "CBS_STACK_PREREQUISITE_NAME=${name#CBS_STACK_PREREQUISITE_}"
         echo "CBS_STACK_PREREQUISITE_REQUIREMENT=$value"
-    done
+    done < <(
+        cbs_stack_manifest_variable_names \
+            "$manifest" \
+            "CBS_STACK_PREREQUISITE_"
+    )
 
-    printf '%s\n' \
-        CBS_STACK_COMPONENT_FASTAPI \
-        CBS_STACK_COMPONENT_SQLALCHEMY \
-        CBS_STACK_COMPONENT_ALEMBIC \
-        CBS_STACK_COMPONENT_POSTGRESQL \
-        CBS_STACK_COMPONENT_POSTGIS \
-        CBS_STACK_COMPONENT_PGVECTOR \
-        CBS_STACK_COMPONENT_REDIS \
-        CBS_STACK_COMPONENT_OPENSEARCH \
-        CBS_STACK_COMPONENT_KONG \
-        CBS_STACK_COMPONENT_KEYCLOAK |
     while IFS= read -r name
     do
+        [[ -n "$name" ]] || continue
+
         value="${!name:-}"
 
+        echo "CBS_STACK_RESOURCE_TYPE=$CBS_STACK_RESOURCE_TYPE_RUNTIME_COMPONENT"
         echo "CBS_STACK_COMPONENT_NAME=${name#CBS_STACK_COMPONENT_}"
         echo "CBS_STACK_COMPONENT_REQUIREMENT=$value"
+    done < <(
+        cbs_stack_manifest_variable_names \
+            "$manifest" \
+            "CBS_STACK_COMPONENT_"
+    )
+
+    while IFS= read -r name
+    do
+        [[ -n "$name" ]] || continue
+
+        value="${!name:-}"
+        [[ -n "$value" ]] || continue
+
+        echo "CBS_STACK_RESOURCE_TYPE=$CBS_STACK_RESOURCE_TYPE_PLATFORM_CAPABILITY"
+        echo "CBS_STACK_CAPABILITY=$value"
+    done < <(
+        cbs_stack_manifest_variable_names \
+            "$manifest" \
+            "CBS_STACK_MANIFEST_CAPABILITY_"
+    )
+
+    local resource_id
+    local field
+    local variable
+
+    for resource_id in ${CBS_STACK_MANAGED_TOOLCHAIN_IDS:-}
+    do
+        echo "CBS_STACK_RESOURCE_TYPE=$CBS_STACK_RESOURCE_TYPE_MANAGED_TOOLCHAIN"
+        echo "CBS_STACK_MANAGED_TOOLCHAIN_ID=$resource_id"
+
+        for field in REQUIREMENT VERSION PROVIDER
+        do
+            variable="CBS_STACK_MANAGED_TOOLCHAIN_${resource_id}_${field}"
+            value="${!variable:-}"
+
+            [[ -n "$value" ]] || continue
+
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_${field}=$value"
+        done
     done
 
-    printf '%s\n' \
-        "${CBS_STACK_MANIFEST_CAPABILITY_START:-}" \
-        "${CBS_STACK_MANIFEST_CAPABILITY_CHECK:-}" \
-        "${CBS_STACK_MANIFEST_CAPABILITY_STATUS:-}" \
-        "${CBS_STACK_MANIFEST_CAPABILITY_QUALIFY:-}" |
-    while IFS= read -r capability
+    for resource_id in ${CBS_STACK_PROJECT_DEPENDENCY_IDS:-}
     do
-        [[ -n "$capability" ]] || continue
-        echo "CBS_STACK_CAPABILITY=$capability"
+        echo "CBS_STACK_RESOURCE_TYPE=$CBS_STACK_RESOURCE_TYPE_PROJECT_DEPENDENCY"
+        echo "CBS_STACK_PROJECT_DEPENDENCY_ID=$resource_id"
+
+        for field in REQUIREMENT VERSION
+        do
+            variable="CBS_STACK_PROJECT_DEPENDENCY_${resource_id}_${field}"
+            value="${!variable:-}"
+
+            [[ -n "$value" ]] || continue
+
+            echo "CBS_STACK_PROJECT_DEPENDENCY_${field}=$value"
+        done
     done
 
     echo "CBS_STACK_RESOLUTION_RESULT=PASS"

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+if [[ "${CBS_TOOLCHAIN_PROVIDER_CONTRACT_LOADED:-0}" == "1" ]]; then
+    return 0 2>/dev/null || true
+fi
+
+CBS_TOOLCHAIN_PROVIDER_CONTRACT_LOADED=1
+readonly CBS_TOOLCHAIN_PROVIDER_CONTRACT_LOADED
+
+CBS_TOOLCHAIN_PROVIDER_CONTRACT_VERSION=1
+readonly CBS_TOOLCHAIN_PROVIDER_CONTRACT_VERSION
+
+readonly CBS_TOOLCHAIN_PROVIDER_OPERATION_DETECT="DETECT"
+readonly CBS_TOOLCHAIN_PROVIDER_OPERATION_ENSURE="ENSURE"
+readonly CBS_TOOLCHAIN_PROVIDER_OPERATION_VERIFY="VERIFY"
+
+cbs_toolchain_provider_operation_is_valid() {
+    case "${1:-}" in
+        "$CBS_TOOLCHAIN_PROVIDER_OPERATION_DETECT"|\
+        "$CBS_TOOLCHAIN_PROVIDER_OPERATION_ENSURE"|\
+        "$CBS_TOOLCHAIN_PROVIDER_OPERATION_VERIFY")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}

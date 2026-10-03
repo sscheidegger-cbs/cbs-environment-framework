@@ -15,6 +15,7 @@ WORKTREE_OBSERVER="$CBS_ROOT/cbs/worktree/worktree_observer.sh"
 WORKTREE_MANAGER="$CBS_ROOT/cbs/worktree/worktree_manager.sh"
 STACK_RESOLVER="$CBS_ROOT/cbs/stack/stack_resolver.sh"
 STACK_PREREQUISITE_EVALUATOR="$CBS_ROOT/cbs/stack/stack_prerequisite_evaluator.sh"
+STACK_TOOLCHAIN_MANAGER="$CBS_ROOT/cbs/stack/stack_toolchain_manager.sh"
 INSTANCE_OBSERVER="$CBS_ROOT/cbs/instance/instance_observer.sh"
 INSTANCE_MANAGER="$CBS_ROOT/cbs/instance/instance_manager.sh"
 PLATFORM_RESOLVER="$CBS_ROOT/cbs/platform/platform_resolver.sh"
@@ -40,6 +41,7 @@ print_help() {
         "  cbs worktree ensure <repository-path> <worktree-path> <branch>" \
         "  cbs stack resolve <manifest>" \
         "  cbs stack prerequisites <manifest>" \
+        "  cbs stack toolchains ensure <manifest>" \
         "  cbs instance check <manifest>" \
         "  cbs instance ensure <manifest>" \
         "  cbs platform resolve <manifest>" \
@@ -246,6 +248,28 @@ main() {
                     fi
 
                     "$STACK_PREREQUISITE_EVALUATOR" "${1:-}"
+                    ;;
+                toolchains)
+                    shift
+                    action="${1:-}"
+
+                    case "$action" in
+                        ensure)
+                            shift
+
+                            if [[ ! -x "$STACK_TOOLCHAIN_MANAGER" ]]; then
+                                echo "CBS_ERROR=STACK_TOOLCHAIN_MANAGER_NOT_EXECUTABLE" >&2
+                                return 3
+                            fi
+
+                            "$STACK_TOOLCHAIN_MANAGER" "${1:-}"
+                            ;;
+                        *)
+                            echo "CBS_ERROR=UNKNOWN_STACK_TOOLCHAIN_COMMAND" >&2
+                            echo "CBS_COMMAND=${action}" >&2
+                            return 2
+                            ;;
+                    esac
                     ;;
                 *)
                     echo "CBS_ERROR=UNKNOWN_STACK_COMMAND" >&2

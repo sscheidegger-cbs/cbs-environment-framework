@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+if [[ "${CBS_TOOLCHAIN_CONTRACT_LOADED:-0}" == "1" ]]; then
+    return 0 2>/dev/null || true
+fi
+
+CBS_TOOLCHAIN_CONTRACT_LOADED=1
+readonly CBS_TOOLCHAIN_CONTRACT_LOADED
+
+CBS_TOOLCHAIN_CONTRACT_VERSION=1
+readonly CBS_TOOLCHAIN_CONTRACT_VERSION
+
+readonly CBS_TOOLCHAIN_INSTALLATION_MISSING="MISSING"
+readonly CBS_TOOLCHAIN_INSTALLATION_PRESENT_COMPATIBLE="PRESENT_COMPATIBLE"
+readonly CBS_TOOLCHAIN_INSTALLATION_PRESENT_INCOMPATIBLE="PRESENT_INCOMPATIBLE"
+readonly CBS_TOOLCHAIN_INSTALLATION_INVALID="INVALID"
+readonly CBS_TOOLCHAIN_INSTALLATION_UNKNOWN="UNKNOWN"
+
+readonly CBS_TOOLCHAIN_DECISION_REUSE="REUSE"
+readonly CBS_TOOLCHAIN_DECISION_INSTALL="INSTALL"
+readonly CBS_TOOLCHAIN_DECISION_RECONCILE="RECONCILE"
+readonly CBS_TOOLCHAIN_DECISION_BLOCK="BLOCK"
+
+readonly CBS_TOOLCHAIN_QUALIFICATION_NOT_QUALIFIED="NOT_QUALIFIED"
+readonly CBS_TOOLCHAIN_QUALIFICATION_QUALIFIED="QUALIFIED"
+readonly CBS_TOOLCHAIN_QUALIFICATION_FAILED="FAILED"
+
+readonly CBS_RC_TOOLCHAIN_INVALID=80
+readonly CBS_RC_TOOLCHAIN_UNKNOWN_PROVIDER=81
+readonly CBS_RC_TOOLCHAIN_PROVIDER_FAILURE=82
+readonly CBS_RC_TOOLCHAIN_USAGE=64
+
+cbs_toolchain_installation_state_is_valid() {
+    case "${1:-}" in
+        "$CBS_TOOLCHAIN_INSTALLATION_MISSING"|\
+        "$CBS_TOOLCHAIN_INSTALLATION_PRESENT_COMPATIBLE"|\
+        "$CBS_TOOLCHAIN_INSTALLATION_PRESENT_INCOMPATIBLE"|\
+        "$CBS_TOOLCHAIN_INSTALLATION_INVALID"|\
+        "$CBS_TOOLCHAIN_INSTALLATION_UNKNOWN")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+cbs_toolchain_decision_is_valid() {
+    case "${1:-}" in
+        "$CBS_TOOLCHAIN_DECISION_REUSE"|\
+        "$CBS_TOOLCHAIN_DECISION_INSTALL"|\
+        "$CBS_TOOLCHAIN_DECISION_RECONCILE"|\
+        "$CBS_TOOLCHAIN_DECISION_BLOCK")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+cbs_toolchain_qualification_state_is_valid() {
+    case "${1:-}" in
+        "$CBS_TOOLCHAIN_QUALIFICATION_NOT_QUALIFIED"|\
+        "$CBS_TOOLCHAIN_QUALIFICATION_QUALIFIED"|\
+        "$CBS_TOOLCHAIN_QUALIFICATION_FAILED")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}

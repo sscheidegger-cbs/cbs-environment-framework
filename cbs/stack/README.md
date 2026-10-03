@@ -197,3 +197,163 @@ B17b-E_STEP_7_READ_ONLY=PASS
 B17b-E_STEP_7_NON_REGRESSION=PASS
 B17b-E_STEP_7_CHANGESET_SCOPE=PASS
 ```
+
+## D01b-B transverse Stack resource model
+
+D01b-B extends the B17b-E Stack layer with a generic resource-classification
+contract and Managed Toolchain lifecycle.
+
+The historical B17b-E behavior remains valid and preserved.
+
+### Canonical Stack resource types
+
+The Stack resource contract defines:
+
+```text
+SYSTEM_PREREQUISITE
+MANAGED_TOOLCHAIN
+PROJECT_DEPENDENCY
+RUNTIME_COMPONENT
+PLATFORM_CAPABILITY
+```
+
+The generic Stack resolver classifies declared resources without requiring a
+technology-specific list in the resolver.
+
+Historical declarations map as follows:
+
+```text
+CBS_STACK_PREREQUISITE_*
+-> SYSTEM_PREREQUISITE
+
+CBS_STACK_COMPONENT_*
+-> RUNTIME_COMPONENT
+
+CBS_STACK_MANIFEST_CAPABILITY_*
+-> PLATFORM_CAPABILITY
+```
+
+Managed Toolchains use explicit declarations such as:
+
+```text
+CBS_STACK_MANAGED_TOOLCHAIN_IDS=FLUTTER
+CBS_STACK_MANAGED_TOOLCHAIN_FLUTTER_REQUIREMENT=REQUIRED
+CBS_STACK_MANAGED_TOOLCHAIN_FLUTTER_VERSION=3.47.6
+CBS_STACK_MANAGED_TOOLCHAIN_FLUTTER_PROVIDER=flutter
+```
+
+Project dependencies can also be declared generically through
+`CBS_STACK_PROJECT_DEPENDENCY_IDS` and associated per-resource fields.
+
+### Stack command semantics
+
+The existing Stack commands remain read-only:
+
+```text
+cbs stack resolve <manifest>
+cbs stack prerequisites <manifest>
+```
+
+Managed Toolchain mutation is explicit and separate:
+
+```text
+cbs stack toolchains ensure <manifest>
+```
+
+`stack resolve` never installs a toolchain.
+
+`stack prerequisites` never installs a workstation prerequisite.
+
+`stack toolchains ensure` is the explicit mutation surface for Managed
+Toolchains.
+
+### Managed Toolchain evaluation
+
+The read-only Stack Toolchain evaluator maps declared Managed Toolchains to
+the generic Toolchain Manager and exposes:
+
+```text
+resource id
+requirement
+version
+provider
+installation state
+resolved path
+decision
+mutation state
+```
+
+Typical compatible result:
+
+```text
+PRESENT_COMPATIBLE
+REUSE
+MUTATION=NONE
+```
+
+### Managed Toolchain ensure
+
+The Stack Toolchain manager delegates mutation to the generic Toolchain
+Manager.
+
+The generic lifecycle distinguishes:
+
+```text
+MISSING             -> INSTALL
+PRESENT_COMPATIBLE  -> REUSE
+PRESENT_INCOMPATIBLE -> RECONCILE
+INVALID             -> BLOCK
+UNKNOWN             -> BLOCK
+```
+
+`RECONCILE` is currently intentionally bounded. Automatic reconciliation is
+not implemented and returns `RECONCILE_NOT_IMPLEMENTED` without invoking a
+provider mutation.
+
+### Provider boundary
+
+Technology-specific behavior remains outside the generic Stack engine.
+
+Provider contract version 1 exposes:
+
+```text
+DETECT
+ENSURE
+VERIFY
+```
+
+Provider `RESOLVE` is intentionally not part of contract version 1.
+Resolution remains a Toolchain Manager responsibility based on provider
+detection output, including the resolved physical path.
+
+### Flutter reference Stack
+
+The first real Stack using this model is:
+
+```text
+stacks/flutter/stack.env
+```
+
+It declares Flutter 3.47.6 as a required Managed Toolchain using the Flutter
+provider.
+
+Dart is verified as part of the Flutter distribution and is not modeled as a
+separate Managed Toolchain in D01b-B.
+
+The qualified CBS-managed physical layout is:
+
+```text
+~/.cbs/toolchains/flutter/<version>
+```
+
+The version is part of the path, so the model does not impose one global
+Flutter version.
+
+### D01b-B qualification boundary
+
+D01b-B qualifies the generic Stack classification and Managed Toolchain
+lifecycle with Flutter as the first real provider.
+
+It does not qualify automatic reconciliation, generic project dependency
+installation, runtime component lifecycle, or multi-stack genericity across
+two heterogeneous real consumers.

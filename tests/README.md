@@ -529,7 +529,7 @@ Current qualified portable result:
 
 ```text
 CBS_PORTABLE_NON_REGRESSION_VERSION=1
-CBS_PORTABLE_TEST_PASS_COUNT=34
+CBS_PORTABLE_TEST_PASS_COUNT=48
 CBS_PORTABLE_TEST_FAIL_COUNT=0
 CBS_HISTORICAL_REAL_STATE_TEST_COUNT=5
 CBS_PORTABLE_NON_REGRESSION_RESULT=PASS
@@ -543,3 +543,108 @@ This boundary separates:
 
 It does not introduce Instance v2 and does not modify the historical
 B17b-F Instance manifest.
+
+## D01b-B Stack / Managed Toolchain test suite
+
+Qualified executable tests:
+
+```text
+tests/test_stack_resource_contract.sh
+tests/test_stack_resource_resolution.sh
+tests/test_stack_toolchain_evaluator.sh
+tests/test_stack_toolchain_cli.sh
+tests/test_toolchain_contract.sh
+tests/test_toolchain_provider_contract.sh
+tests/test_toolchain_manager.sh
+tests/test_toolchain_ensure.sh
+tests/test_toolchain_provider_failure.sh
+tests/test_toolchain_reconcile.sh
+tests/test_toolchain_fixture_provider.sh
+tests/test_flutter_provider.sh
+tests/test_flutter_toolchain_manager.sh
+tests/test_flutter_stack_manifest.sh
+```
+
+### Stack resource classification
+
+Validates the canonical resource classes:
+
+```text
+SYSTEM_PREREQUISITE
+MANAGED_TOOLCHAIN
+PROJECT_DEPENDENCY
+RUNTIME_COMPONENT
+PLATFORM_CAPABILITY
+```
+
+It also validates preservation of historical prerequisite, component and
+capability outputs.
+
+### Managed Toolchain lifecycle
+
+Validates:
+
+```text
+MISSING -> INSTALL
+PRESENT_COMPATIBLE -> REUSE
+PRESENT_INCOMPATIBLE -> RECONCILE
+INVALID -> BLOCK
+UNKNOWN -> BLOCK
+```
+
+`resolve` remains read-only.
+
+`ensure` is explicit, performs mutation only when required, and always verifies
+the resulting installation before returning PASS.
+
+Automatic RECONCILE is intentionally not implemented. The incompatible case
+is explicitly tested and returns `RECONCILE_NOT_IMPLEMENTED` without provider
+mutation.
+
+### Provider contract
+
+Provider contract version 1 validates the operations:
+
+```text
+DETECT
+ENSURE
+VERIFY
+```
+
+Provider `RESOLVE` is explicitly excluded from version 1.
+
+Tests also validate unknown providers, provider failures, malformed successful
+ENSURE results and unsupported provider operations.
+
+### Flutter provider qualification
+
+The Flutter tests validate:
+
+```text
+missing installation detection
+hermetic installation
+compatible installation detection
+Flutter version verification
+bundled Dart version verification
+multi-version path model
+Toolchain Manager integration
+Stack manifest integration
+reuse without mutation
+```
+
+Flutter 3.47.6 is also qualified through a real CBS-managed installation under:
+
+```text
+~/.cbs/toolchains/flutter/3.47.6
+```
+
+The real qualification demonstrated REUSE with `MUTATION=NONE` and successful
+post-resolution verification.
+
+### D01b-B qualification boundary
+
+D01b-B does not qualify automatic incompatible-version reconciliation or
+multi-stack genericity across two heterogeneous real consumers.
+
+The historical B17 real-state tests remain preserved and excluded from the
+portable runner exactly as before.
