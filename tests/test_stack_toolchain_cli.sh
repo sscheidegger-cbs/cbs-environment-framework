@@ -31,13 +31,13 @@ OUTPUT="$(
 RC=$?
 set -e
 
-[[ "$RC" -eq 0 ]] ||
+[[ "$RC" -eq 71 ]] ||
     fail "ENSURE_RC"
 
 grep -Fq \
     'CBS_STACK_MANAGED_TOOLCHAIN_ID=FLUTTER' \
     <<<"$OUTPUT" ||
-    fail "TOOLCHAIN_ID"
+    fail "FLUTTER_ID"
 
 grep -Fq \
     'CBS_STACK_MANAGED_TOOLCHAIN_ACTION=REUSE' \
@@ -45,21 +45,46 @@ grep -Fq \
     fail "REUSE_ACTION"
 
 grep -Fq \
-    'CBS_STACK_MANAGED_TOOLCHAIN_MUTATION=NONE' \
-    <<<"$OUTPUT" ||
-    fail "REUSE_MUTATION"
-
-grep -Fq \
     'CBS_STACK_MANAGED_TOOLCHAIN_VERIFICATION_RESULT=PASS' \
     <<<"$OUTPUT" ||
     fail "VERIFY"
 
 grep -Fq \
-    'CBS_STACK_TOOLCHAIN_ENSURE_RESULT=PASS' \
+    'CBS_STACK_MANAGED_TOOLCHAIN_ID=ANDROID_SDK' \
+    <<<"$OUTPUT" ||
+    fail "ANDROID_SDK_ID"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_ID=XCODE' \
+    <<<"$OUTPUT" ||
+    fail "XCODE_ID"
+
+grep -Fq \
+    'CBS_TOOLCHAIN_ERROR=BLOCKED' \
+    <<<"$OUTPUT" ||
+    fail "XCODE_BLOCK"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_REQUIRED_COUNT=3' \
+    <<<"$OUTPUT" ||
+    fail "REQUIRED_COUNT"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_ENSURED_COUNT=2' \
+    <<<"$OUTPUT" ||
+    fail "ENSURED_COUNT"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_FAILURE_COUNT=1' \
+    <<<"$OUTPUT" ||
+    fail "FAILURE_COUNT"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_ENSURE_RESULT=FAIL' \
     <<<"$OUTPUT" ||
     fail "RESULT"
 
-echo "TEST_STACK_TOOLCHAIN_CLI_ENSURE=PASS"
+echo "TEST_STACK_TOOLCHAIN_CLI_HOST_BOUND_BLOCK=PASS"
 
 printf '%s\n' '--- help exposure ---'
 

@@ -157,7 +157,8 @@ cbs_toolchain_decision_from_state() {
             printf '%s\n' "$CBS_TOOLCHAIN_DECISION_RECONCILE"
             ;;
         "$CBS_TOOLCHAIN_INSTALLATION_INVALID"|\
-        "$CBS_TOOLCHAIN_INSTALLATION_UNKNOWN")
+        "$CBS_TOOLCHAIN_INSTALLATION_UNKNOWN"|\
+        "$CBS_TOOLCHAIN_INSTALLATION_NOT_APPLICABLE")
             printf '%s\n' "$CBS_TOOLCHAIN_DECISION_BLOCK"
             ;;
         *)

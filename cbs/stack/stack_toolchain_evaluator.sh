@@ -43,6 +43,7 @@ cbs_stack_toolchain_evaluate() {
 
     local required_count=0
     local missing_count=0
+    local not_applicable_count=0
     local failure_count=0
 
     local resource_id
@@ -101,7 +102,18 @@ cbs_stack_toolchain_evaluate() {
         # Stack declaration identifiers are symbolic resource keys.
         # The generic toolchain identity is derived deterministically
         # without any technology-specific mapping.
-        toolchain_id="$(printf '%s' "$resource_id" | tr '[:upper:]' '[:lower:]')"
+        toolchain_id="$(
+            cbs_stack_toolchain_manifest_value \
+                "$resource_id" \
+                "ID"
+        )"
+
+        if [[ -z "$toolchain_id" ]]; then
+            toolchain_id="$(
+                printf '%s' "$resource_id" |
+                    tr '[:upper:]' '[:lower:]'
+            )"
+        fi
 
         local toolchain_manifest
         toolchain_manifest="$(mktemp)"
@@ -164,13 +176,21 @@ MANIFEST
         echo "CBS_STACK_MANAGED_TOOLCHAIN_MUTATION=$mutation"
         echo "CBS_STACK_MANAGED_TOOLCHAIN_RESULT=PASS"
 
-        if [[ "$requirement" == "REQUIRED" && "$installation_state" == "MISSING" ]]; then
-            missing_count=$((missing_count + 1))
+        if [[ "$requirement" == "REQUIRED" ]]; then
+            case "$installation_state" in
+                MISSING)
+                    missing_count=$((missing_count + 1))
+                    ;;
+                NOT_APPLICABLE)
+                    not_applicable_count=$((not_applicable_count + 1))
+                    ;;
+            esac
         fi
     done
 
     echo "CBS_STACK_TOOLCHAIN_REQUIRED_COUNT=$required_count"
     echo "CBS_STACK_TOOLCHAIN_MISSING_COUNT=$missing_count"
+    echo "CBS_STACK_TOOLCHAIN_NOT_APPLICABLE_COUNT=$not_applicable_count"
     echo "CBS_STACK_TOOLCHAIN_FAILURE_COUNT=$failure_count"
 
     if [[ "$failure_count" -gt 0 ]]; then

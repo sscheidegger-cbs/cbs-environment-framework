@@ -97,7 +97,18 @@ cbs_stack_toolchain_ensure() {
                 ;;
         esac
 
-        toolchain_id="$(printf '%s' "$resource_id" | tr '[:upper:]' '[:lower:]')"
+        toolchain_id="$(
+            cbs_stack_toolchain_manifest_value \
+                "$resource_id" \
+                "ID"
+        )"
+
+        if [[ -z "$toolchain_id" ]]; then
+            toolchain_id="$(
+                printf '%s' "$resource_id" |
+                    tr '[:upper:]' '[:lower:]'
+            )"
+        fi
 
         local toolchain_manifest
         toolchain_manifest="$(mktemp)"
