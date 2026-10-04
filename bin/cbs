@@ -20,6 +20,7 @@ INSTANCE_OBSERVER="$CBS_ROOT/cbs/instance/instance_observer.sh"
 INSTANCE_MANAGER="$CBS_ROOT/cbs/instance/instance_manager.sh"
 PLATFORM_RESOLVER="$CBS_ROOT/cbs/platform/platform_resolver.sh"
 PLATFORM_HOOK_RUNNER="$CBS_ROOT/cbs/platform/platform_hook_runner.sh"
+ANDROID_EMULATOR_MANAGER="$CBS_ROOT/cbs/runtime/android_emulator_manager.sh"
 
 print_help() {
     printf "%s\n" \
@@ -44,6 +45,10 @@ print_help() {
         "  cbs stack toolchains ensure <manifest>" \
         "  cbs instance check <manifest>" \
         "  cbs instance ensure <manifest>" \
+        "  cbs runtime android ensure [device]" \
+        "  cbs runtime android start [device]" \
+        "  cbs runtime android list" \
+        "  cbs runtime android stop [device]" \
         "  cbs platform resolve <manifest>" \
         "  cbs platform start <manifest>" \
         "  cbs platform check <manifest>" \
@@ -307,6 +312,31 @@ main() {
                 *)
                     echo "CBS_ERROR=UNKNOWN_INSTANCE_COMMAND" >&2
                     echo "CBS_COMMAND=${subcommand}" >&2
+                    return 2
+                    ;;
+            esac
+            ;;
+
+        runtime)
+            shift
+            runtime_type="${1:-}"
+
+            case "$runtime_type" in
+                android)
+                    shift
+                    action="${1:-}"
+                    shift || true
+
+                    if [[ ! -x "$ANDROID_EMULATOR_MANAGER" ]]; then
+                        echo "CBS_ERROR=ANDROID_EMULATOR_MANAGER_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$ANDROID_EMULATOR_MANAGER" "$action" "${1:-medium_phone}"
+                    ;;
+                *)
+                    echo "CBS_ERROR=UNKNOWN_RUNTIME_TYPE" >&2
+                    echo "CBS_RUNTIME_TYPE=${runtime_type}" >&2
                     return 2
                     ;;
             esac
