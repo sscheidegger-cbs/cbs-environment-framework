@@ -36,6 +36,8 @@ readonly CBS_ANDROID_PLATFORM_PACKAGE="platforms;android-36"
 readonly CBS_ANDROID_BUILD_TOOLS_PACKAGE="build-tools;36.0.0"
 readonly CBS_ANDROID_PLATFORM_TOOLS_PACKAGE="platform-tools"
 readonly CBS_ANDROID_NDK_PACKAGE="ndk;28.2.13676358"
+readonly CBS_ANDROID_EMULATOR_PACKAGE="emulator"
+readonly CBS_ANDROID_SYSTEM_IMAGE_PACKAGE="system-images;android-36;google_apis_playstore;x86_64"
 
 readonly CBS_ANDROID_CMDLINE_TOOLS_URL_DEFAULT="https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip"
 readonly CBS_ANDROID_CMDLINE_TOOLS_SHA1_DEFAULT="e025545c62a8e64c7559119566a569fb1dec5f60"
@@ -46,6 +48,8 @@ cbs_android_sdk_detect() {
     local aapt2="$resolved_path/build-tools/36.0.0/aapt2"
     local platform_jar="$resolved_path/platforms/android-36/android.jar"
     local ndk_dir="$resolved_path/ndk/28.2.13676358"
+    local emulator="$resolved_path/emulator/emulator"
+    local system_image_properties="$resolved_path/system-images/android-36/google_apis_playstore/x86_64/source.properties"
 
     if [[ ! -e "$resolved_path" ]]; then
         echo "CBS_TOOLCHAIN_PROVIDER_INSTALLATION_STATE=MISSING"
@@ -58,7 +62,9 @@ cbs_android_sdk_detect() {
         ! -x "$adb" || \
         ! -x "$aapt2" || \
         ! -f "$platform_jar" || \
-        ! -d "$ndk_dir" \
+        ! -d "$ndk_dir" || \
+        ! -x "$emulator" || \
+        ! -f "$system_image_properties" \
     ]]; then
         echo "CBS_TOOLCHAIN_PROVIDER_INSTALLATION_STATE=INVALID"
         echo "CBS_TOOLCHAIN_PROVIDER_RESOLVED_PATH=$resolved_path"
@@ -96,6 +102,9 @@ cbs_android_sdk_verify() {
     local aapt2="$resolved_path/build-tools/36.0.0/aapt2"
     local platform_jar="$resolved_path/platforms/android-36/android.jar"
     local ndk_dir="$resolved_path/ndk/28.2.13676358"
+    local emulator="$resolved_path/emulator/emulator"
+    local emulator_properties="$resolved_path/emulator/source.properties"
+    local system_image_properties="$resolved_path/system-images/android-36/google_apis_playstore/x86_64/source.properties"
 
     local cmdline_properties="$resolved_path/cmdline-tools/23.0/source.properties"
     local platform_tools_properties="$resolved_path/platform-tools/source.properties"
@@ -113,7 +122,10 @@ cbs_android_sdk_verify() {
         ! -f "$platform_tools_properties" || \
         ! -f "$build_tools_properties" || \
         ! -f "$platform_properties" || \
-        ! -f "$ndk_properties" \
+        ! -f "$ndk_properties" || \
+        ! -x "$emulator" || \
+        ! -f "$emulator_properties" || \
+        ! -f "$system_image_properties" \
     ]]; then
         echo "CBS_TOOLCHAIN_PROVIDER_VERIFY_RESULT=FAIL"
         return 82
@@ -124,6 +136,11 @@ cbs_android_sdk_verify() {
     local build_tools_version
     local platform_api_level
     local ndk_version
+    local emulator_version
+    local system_image_version
+    local system_image_api
+    local system_image_tag
+    local system_image_abi
 
     cmdline_version="$(
         cbs_android_sdk_property_value \
@@ -155,12 +172,47 @@ cbs_android_sdk_verify() {
             "Pkg.Revision"
     )"
 
+    emulator_version="$(
+        cbs_android_sdk_property_value \
+            "$emulator_properties" \
+            "Pkg.Revision"
+    )"
+
+    system_image_version="$(
+        cbs_android_sdk_property_value \
+            "$system_image_properties" \
+            "Pkg.Revision"
+    )"
+
+    system_image_api="$(
+        cbs_android_sdk_property_value \
+            "$system_image_properties" \
+            "AndroidVersion.ApiLevel"
+    )"
+
+    system_image_tag="$(
+        cbs_android_sdk_property_value \
+            "$system_image_properties" \
+            "SystemImage.TagId"
+    )"
+
+    system_image_abi="$(
+        cbs_android_sdk_property_value \
+            "$system_image_properties" \
+            "SystemImage.Abi"
+    )"
+
     if [[ \
         "$cmdline_version" != "23.0" || \
         "$platform_tools_version" != "37.0.1" || \
         "$build_tools_version" != "36.0.0" || \
         "$platform_api_level" != "36" || \
-        "$ndk_version" != "28.2.13676358" \
+        "$ndk_version" != "28.2.13676358" || \
+        "$emulator_version" != "37.2.12" || \
+        "$system_image_version" != "7" || \
+        "$system_image_api" != "36" || \
+        "$system_image_tag" != "google_apis_playstore" || \
+        "$system_image_abi" != "x86_64" \
     ]]; then
         echo "CBS_TOOLCHAIN_PROVIDER_VERIFY_RESULT=FAIL"
         return 82
@@ -173,6 +225,8 @@ cbs_android_sdk_verify() {
     echo "CBS_ANDROID_SDK_PLATFORM_OBSERVED=android-$platform_api_level"
     echo "CBS_ANDROID_SDK_BUILD_TOOLS_OBSERVED=$build_tools_version"
     echo "CBS_ANDROID_SDK_NDK_OBSERVED=$ndk_version"
+    echo "CBS_ANDROID_SDK_EMULATOR_OBSERVED=$emulator_version"
+    echo "CBS_ANDROID_SDK_SYSTEM_IMAGE_OBSERVED=android-$system_image_api/$system_image_tag/$system_image_abi"
     echo "CBS_TOOLCHAIN_PROVIDER_VERIFY_RESULT=PASS"
 }
 
@@ -277,7 +331,9 @@ cbs_android_sdk_ensure() {
         "$CBS_ANDROID_PLATFORM_TOOLS_PACKAGE" \
         "$CBS_ANDROID_PLATFORM_PACKAGE" \
         "$CBS_ANDROID_BUILD_TOOLS_PACKAGE" \
-        "$CBS_ANDROID_NDK_PACKAGE"
+        "$CBS_ANDROID_NDK_PACKAGE" \
+        "$CBS_ANDROID_EMULATOR_PACKAGE" \
+        "$CBS_ANDROID_SYSTEM_IMAGE_PACKAGE"
     then
         fail_provider "SDK_PACKAGE_INSTALL_FAILED"
     fi

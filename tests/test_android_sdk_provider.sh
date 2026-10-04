@@ -73,6 +73,12 @@ grep -Fq 'platform-tools' "$PROVIDER" ||
 grep -Fq 'ndk;28.2.13676358' "$PROVIDER" ||
     fail "NDK_PROFILE"
 
+grep -Fq 'CBS_ANDROID_EMULATOR_PACKAGE="emulator"' "$PROVIDER" ||
+    fail "EMULATOR_PROFILE"
+
+grep -Fq 'system-images;android-36;google_apis_playstore;x86_64' "$PROVIDER" ||
+    fail "SYSTEM_IMAGE_PROFILE"
+
 echo "TEST_ANDROID_SDK_PROVIDER_PROFILE=PASS"
 
 
@@ -109,7 +115,9 @@ mkdir -p \
     "$sdk_root/platform-tools" \
     "$sdk_root/platforms/android-36" \
     "$sdk_root/build-tools/36.0.0" \
-    "$sdk_root/ndk/28.2.13676358"
+    "$sdk_root/ndk/28.2.13676358" \
+    "$sdk_root/emulator" \
+    "$sdk_root/system-images/android-36/google_apis_playstore/x86_64"
 
 cat > "$sdk_root/platform-tools/adb" <<'ADB'
 #!/usr/bin/env bash
@@ -122,6 +130,12 @@ cat > "$sdk_root/build-tools/36.0.0/aapt2" <<'AAPT2'
 echo "Android Asset Packaging Tool"
 AAPT2
 chmod +x "$sdk_root/build-tools/36.0.0/aapt2"
+
+cat > "$sdk_root/emulator/emulator" <<'EMULATOR'
+#!/usr/bin/env bash
+echo "Android emulator version 37.2.12.0"
+EMULATOR
+chmod +x "$sdk_root/emulator/emulator"
 
 : > "$sdk_root/platforms/android-36/android.jar"
 
@@ -144,6 +158,17 @@ EOF_META
 
 cat > "$sdk_root/ndk/28.2.13676358/source.properties" <<'EOF_META'
 Pkg.Revision=28.2.13676358
+EOF_META
+
+cat > "$sdk_root/emulator/source.properties" <<'EOF_META'
+Pkg.Revision=37.2.12
+EOF_META
+
+cat > "$sdk_root/system-images/android-36/google_apis_playstore/x86_64/source.properties" <<'EOF_META'
+Pkg.Revision=7
+AndroidVersion.ApiLevel=36
+SystemImage.Abi=x86_64
+SystemImage.TagId=google_apis_playstore
 EOF_META
 
 exit 0
@@ -210,6 +235,12 @@ RESOLVED_PATH="$TOOLCHAIN_ROOT/android-sdk/36"
 
 [[ -d "$RESOLVED_PATH/ndk/28.2.13676358" ]] ||
     fail "NDK_MISSING"
+
+[[ -x "$RESOLVED_PATH/emulator/emulator" ]] ||
+    fail "EMULATOR_MISSING"
+
+[[ -f "$RESOLVED_PATH/system-images/android-36/google_apis_playstore/x86_64/source.properties" ]] ||
+    fail "SYSTEM_IMAGE_MISSING"
 
 echo "TEST_ANDROID_SDK_PROVIDER_ENSURE=PASS"
 
