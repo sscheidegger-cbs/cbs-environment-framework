@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 source "$ROOT/cbs/stack/contract.sh"
 source "$ROOT/cbs/stack/stack_resolver.sh"
+source "$ROOT/cbs/toolchain/contract.sh"
 
 TOOLCHAIN_MANAGER="$ROOT/cbs/toolchain/toolchain_manager.sh"
 
@@ -43,6 +44,7 @@ cbs_stack_toolchain_ensure() {
 
     local required_count=0
     local ensured_count=0
+    local not_applicable_count=0
     local failure_count=0
 
     local resource_id
@@ -119,21 +121,77 @@ CBS_TOOLCHAIN_VERSION=$version
 CBS_TOOLCHAIN_PROVIDER=$provider
 MANIFEST
 
-        local ensure_output
-        local ensure_rc
+        local resolution_output
+        local resolution_rc
 
         set +e
-        ensure_output="$("$TOOLCHAIN_MANAGER" ensure "$toolchain_manifest" 2>&1)"
-        ensure_rc=$?
+        resolution_output="$(
+            "$TOOLCHAIN_MANAGER" resolve "$toolchain_manifest" 2>&1
+        )"
+        resolution_rc=$?
         set -e
-
-        rm -f "$toolchain_manifest"
 
         echo "CBS_STACK_RESOURCE_TYPE=MANAGED_TOOLCHAIN"
         echo "CBS_STACK_MANAGED_TOOLCHAIN_ID=$resource_id"
         echo "CBS_STACK_MANAGED_TOOLCHAIN_REQUIREMENT=$requirement"
         echo "CBS_STACK_MANAGED_TOOLCHAIN_VERSION=$version"
         echo "CBS_STACK_MANAGED_TOOLCHAIN_PROVIDER=$provider"
+
+        if [[ "$resolution_rc" -ne 0 ]]; then
+            rm -f "$toolchain_manifest"
+            echo "$resolution_output"
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_RESULT=FAIL"
+            failure_count=$((failure_count + 1))
+            continue
+        fi
+
+        local installation_state=""
+        local resolution_path=""
+        local resolution_decision=""
+        local resolution_mutation=""
+
+        while IFS= read -r line
+        do
+            case "$line" in
+                CBS_TOOLCHAIN_INSTALLATION_STATE=*)
+                    installation_state="${line#CBS_TOOLCHAIN_INSTALLATION_STATE=}"
+                    ;;
+                CBS_TOOLCHAIN_RESOLVED_PATH=*)
+                    resolution_path="${line#CBS_TOOLCHAIN_RESOLVED_PATH=}"
+                    ;;
+                CBS_TOOLCHAIN_DECISION=*)
+                    resolution_decision="${line#CBS_TOOLCHAIN_DECISION=}"
+                    ;;
+                CBS_TOOLCHAIN_MUTATION=*)
+                    resolution_mutation="${line#CBS_TOOLCHAIN_MUTATION=}"
+                    ;;
+            esac
+        done <<<"$resolution_output"
+
+        if [[ "$installation_state" == "$CBS_TOOLCHAIN_INSTALLATION_NOT_APPLICABLE" ]]; then
+            rm -f "$toolchain_manifest"
+
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_INSTALLATION_STATE=$installation_state"
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_RESOLVED_PATH=$resolution_path"
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_DECISION=$resolution_decision"
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_MUTATION=$resolution_mutation"
+            echo "CBS_STACK_MANAGED_TOOLCHAIN_RESULT=PASS"
+
+            not_applicable_count=$((not_applicable_count + 1))
+            continue
+        fi
+
+        local ensure_output
+        local ensure_rc
+
+        set +e
+        ensure_output="$(
+            "$TOOLCHAIN_MANAGER" ensure "$toolchain_manifest" 2>&1
+        )"
+        ensure_rc=$?
+        set -e
+
+        rm -f "$toolchain_manifest"
 
         if [[ "$ensure_rc" -ne 0 ]]; then
             echo "$ensure_output"
@@ -181,6 +239,7 @@ MANIFEST
 
     echo "CBS_STACK_TOOLCHAIN_REQUIRED_COUNT=$required_count"
     echo "CBS_STACK_TOOLCHAIN_ENSURED_COUNT=$ensured_count"
+    echo "CBS_STACK_TOOLCHAIN_NOT_APPLICABLE_COUNT=$not_applicable_count"
     echo "CBS_STACK_TOOLCHAIN_FAILURE_COUNT=$failure_count"
 
     if [[ "$failure_count" -gt 0 ]]; then

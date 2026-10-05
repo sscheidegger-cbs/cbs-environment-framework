@@ -31,7 +31,7 @@ OUTPUT="$(
 RC=$?
 set -e
 
-[[ "$RC" -eq 71 ]] ||
+[[ "$RC" -eq 0 ]] ||
     fail "ENSURE_RC"
 
 grep -Fq \
@@ -60,9 +60,19 @@ grep -Fq \
     fail "XCODE_ID"
 
 grep -Fq \
-    'CBS_TOOLCHAIN_ERROR=BLOCKED' \
+    'CBS_STACK_MANAGED_TOOLCHAIN_INSTALLATION_STATE=NOT_APPLICABLE' \
     <<<"$OUTPUT" ||
-    fail "XCODE_BLOCK"
+    fail "XCODE_NOT_APPLICABLE"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_DECISION=BLOCK' \
+    <<<"$OUTPUT" ||
+    fail "XCODE_DECISION"
+
+grep -Fq \
+    'CBS_STACK_MANAGED_TOOLCHAIN_MUTATION=NONE' \
+    <<<"$OUTPUT" ||
+    fail "XCODE_MUTATION"
 
 grep -Fq \
     'CBS_STACK_TOOLCHAIN_REQUIRED_COUNT=3' \
@@ -75,16 +85,21 @@ grep -Fq \
     fail "ENSURED_COUNT"
 
 grep -Fq \
-    'CBS_STACK_TOOLCHAIN_FAILURE_COUNT=1' \
+    'CBS_STACK_TOOLCHAIN_NOT_APPLICABLE_COUNT=1' \
+    <<<"$OUTPUT" ||
+    fail "NOT_APPLICABLE_COUNT"
+
+grep -Fq \
+    'CBS_STACK_TOOLCHAIN_FAILURE_COUNT=0' \
     <<<"$OUTPUT" ||
     fail "FAILURE_COUNT"
 
 grep -Fq \
-    'CBS_STACK_TOOLCHAIN_ENSURE_RESULT=FAIL' \
+    'CBS_STACK_TOOLCHAIN_ENSURE_RESULT=PASS' \
     <<<"$OUTPUT" ||
     fail "RESULT"
 
-echo "TEST_STACK_TOOLCHAIN_CLI_HOST_BOUND_BLOCK=PASS"
+echo "TEST_STACK_TOOLCHAIN_CLI_HOST_BOUND_NOT_APPLICABLE=PASS"
 
 printf '%s\n' '--- help exposure ---'
 
