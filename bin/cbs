@@ -16,6 +16,7 @@ WORKTREE_MANAGER="$CBS_ROOT/cbs/worktree/worktree_manager.sh"
 STACK_RESOLVER="$CBS_ROOT/cbs/stack/stack_resolver.sh"
 STACK_PREREQUISITE_EVALUATOR="$CBS_ROOT/cbs/stack/stack_prerequisite_evaluator.sh"
 STACK_TOOLCHAIN_MANAGER="$CBS_ROOT/cbs/stack/stack_toolchain_manager.sh"
+STACK_ENVIRONMENT="$CBS_ROOT/cbs/stack/stack_environment.sh"
 INSTANCE_OBSERVER="$CBS_ROOT/cbs/instance/instance_observer.sh"
 INSTANCE_MANAGER="$CBS_ROOT/cbs/instance/instance_manager.sh"
 PLATFORM_RESOLVER="$CBS_ROOT/cbs/platform/platform_resolver.sh"
@@ -43,6 +44,7 @@ print_help() {
         "  cbs stack resolve <manifest>" \
         "  cbs stack prerequisites <manifest>" \
         "  cbs stack toolchains ensure <manifest>" \
+        "  cbs stack environment <manifest>" \
         "  cbs instance check <manifest>" \
         "  cbs instance ensure <manifest>" \
         "  cbs runtime android ensure [device]" \
@@ -275,6 +277,16 @@ main() {
                             return 2
                             ;;
                     esac
+                    ;;
+                environment)
+                    shift
+
+                    if [[ ! -x "$STACK_ENVIRONMENT" ]]; then
+                        echo "CBS_ERROR=STACK_ENVIRONMENT_NOT_EXECUTABLE" >&2
+                        return 3
+                    fi
+
+                    "$STACK_ENVIRONMENT" "${1:-}"
                     ;;
                 *)
                     echo "CBS_ERROR=UNKNOWN_STACK_COMMAND" >&2
