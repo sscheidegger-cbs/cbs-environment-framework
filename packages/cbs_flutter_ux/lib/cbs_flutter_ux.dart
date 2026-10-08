@@ -3,6 +3,7 @@
 /// Independent from application business logic and backend APIs.
 library;
 
+export 'src/components/primitives/cbs_button.dart';
 export 'src/foundation/tokens/cbs_radius.dart';
 export 'src/foundation/tokens/cbs_spacing.dart';
 export 'src/foundation/theme/cbs_theme.dart';
