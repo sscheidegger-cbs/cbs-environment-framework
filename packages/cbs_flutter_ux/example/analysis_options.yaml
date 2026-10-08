@@ -1,0 +1,9 @@
+# Static analysis for the CBS Flutter UX/UI showcase.
+#
+# Keep this example independent from additional lint packages.
+# The reusable package maintains its own analysis configuration.
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**

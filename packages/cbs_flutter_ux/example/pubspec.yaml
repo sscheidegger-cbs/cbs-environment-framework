@@ -1,0 +1,19 @@
+name: cbs_flutter_ux_example
+description: Visual showcase for the CBS Flutter UX/UI package.
+publish_to: none
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cbs_flutter_ux:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
