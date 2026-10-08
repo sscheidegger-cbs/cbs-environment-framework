@@ -1,0 +1,6 @@
+# Dart and Flutter generated files
+.dart_tool/
+build/
+
+# Local dependency resolution for reusable package
+pubspec.lock
