@@ -3,6 +3,8 @@
 /// Independent from application business logic and backend APIs.
 library;
 
+export 'src/foundation/theme/cbs_theme.dart';
+
 /// Public identity of the CBS Flutter UX/UI framework.
 ///
 /// This initial contract proves that consuming applications can
