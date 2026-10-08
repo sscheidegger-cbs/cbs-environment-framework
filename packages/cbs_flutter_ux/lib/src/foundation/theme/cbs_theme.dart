@@ -18,6 +18,7 @@ abstract final class CbsTheme {
     required Color primaryColor,
     Brightness brightness = Brightness.light,
     TextTheme? textTheme,
+    double? buttonRadius,
   }) {
     return ThemeData(
       useMaterial3: true,
@@ -26,6 +27,15 @@ abstract final class CbsTheme {
         brightness: brightness,
       ),
       textTheme: textTheme,
+      filledButtonTheme: buttonRadius == null
+          ? null
+          : FilledButtonThemeData(
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(buttonRadius),
+                ),
+              ),
+            ),
     );
   }
 }

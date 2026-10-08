@@ -56,6 +56,17 @@ void main() {
       expect(theme.textTheme, expected.textTheme);
     });
 
+    test('preserves default button shape without customization', () {
+      final theme = CbsTheme.branded(primaryColor: Colors.green);
+
+      final expected = ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+      );
+
+      expect(theme.filledButtonTheme.style, expected.filledButtonTheme.style);
+    });
+
     test('supports custom branded typography', () {
       const customTextTheme = TextTheme(
         headlineLarge: TextStyle(

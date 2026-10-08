@@ -3,6 +3,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('inherits branded button radius', (tester) async {
+    final theme = CbsTheme.branded(
+      primaryColor: Colors.green,
+      buttonRadius: CbsRadius.lg,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: CbsButton(label: 'Continue', onPressed: () {}),
+        ),
+      ),
+    );
+
+    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+
+    final shape =
+        button.style?.shape?.resolve(<WidgetState>{}) ??
+        theme.filledButtonTheme.style?.shape?.resolve(<WidgetState>{});
+
+    expect(shape, isA<RoundedRectangleBorder>());
+
+    final border = shape! as RoundedRectangleBorder;
+
+    expect(border.borderRadius, BorderRadius.circular(CbsRadius.lg));
+  });
+
   Widget buildApp({
     required ThemeData theme,
     required VoidCallback? onPressed,
