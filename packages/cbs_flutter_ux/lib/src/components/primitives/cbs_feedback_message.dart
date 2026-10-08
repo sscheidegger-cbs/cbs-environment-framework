@@ -8,11 +8,17 @@ class CbsFeedbackMessage extends StatelessWidget {
   const CbsFeedbackMessage({
     required this.message,
     this.type = CbsFeedbackType.info,
+    this.semanticLabel,
     super.key,
   });
 
   final String message;
   final CbsFeedbackType type;
+
+  /// Accessible description, including the message severity when relevant.
+  ///
+  /// Provided by the consuming application in its current language.
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +47,7 @@ class CbsFeedbackMessage extends StatelessWidget {
       ),
     };
 
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: background,
@@ -57,6 +63,16 @@ class CbsFeedbackMessage extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (semanticLabel == null) {
+      return content;
+    }
+
+    return Semantics(
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: content,
     );
   }
 }
