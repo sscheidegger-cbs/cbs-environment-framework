@@ -44,5 +44,35 @@ void main() {
 
       expect(theme.colorScheme.brightness, Brightness.dark);
     });
+
+    test('preserves default typography without customization', () {
+      final theme = CbsTheme.branded(primaryColor: Colors.green);
+
+      final expected = ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+      );
+
+      expect(theme.textTheme, expected.textTheme);
+    });
+
+    test('supports custom branded typography', () {
+      const customTextTheme = TextTheme(
+        headlineLarge: TextStyle(
+          fontFamily: 'CBSBrand',
+          fontSize: 36,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+
+      final theme = CbsTheme.branded(
+        primaryColor: Colors.green,
+        textTheme: customTextTheme,
+      );
+
+      expect(theme.textTheme.headlineLarge?.fontFamily, 'CBSBrand');
+      expect(theme.textTheme.headlineLarge?.fontSize, 36);
+      expect(theme.textTheme.headlineLarge?.fontWeight, FontWeight.w700);
+    });
   });
 }

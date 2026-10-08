@@ -17,6 +17,7 @@ abstract final class CbsTheme {
   static ThemeData branded({
     required Color primaryColor,
     Brightness brightness = Brightness.light,
+    TextTheme? textTheme,
   }) {
     return ThemeData(
       useMaterial3: true,
@@ -24,6 +25,7 @@ abstract final class CbsTheme {
         seedColor: primaryColor,
         brightness: brightness,
       ),
+      textTheme: textTheme,
     );
   }
 }
