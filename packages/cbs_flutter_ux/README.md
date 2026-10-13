@@ -28,6 +28,7 @@ The package provides:
 - Typed theme configuration.
 - Typed feedback style.
 - Reusable UI primitives.
+- Presentation-state patterns (state panel, retry message).
 - Automated Flutter tests.
 
 The package does not provide application-specific
@@ -57,6 +58,11 @@ Available primitives:
 - CbsButton
 - CbsLoadingIndicator
 - CbsFeedbackMessage
+
+Available presentation-state patterns:
+
+- CbsStatePanel
+- CbsRetryMessage
 
 Consumers must use the public entry point
 rather than importing internal files from lib/src.
@@ -286,7 +292,18 @@ Parameters:
 - message: required visible message.
 - type: optional severity, defaulting to info.
 - semanticLabel: optional accessible description.
+- expand: optional, defaulting to false.
 - key: optional Flutter widget key.
+
+By default the message is as wide as its content.
+With expand set to true it takes the maximum width
+allowed by its parent, which must provide a bounded width:
+
+    const CbsFeedbackMessage(
+      message: 'Unable to load',
+      type: CbsFeedbackType.error,
+      expand: true,
+    );
 
 Supported feedback types:
 
@@ -305,16 +322,88 @@ The consuming application is responsible
 for providing localized message text
 and accessible descriptions.
 
-## 8. Accessibility
+## 8. Presentation-state patterns
+
+These patterns are presentation only. The consuming
+application keeps its controller, its state model,
+its data loading, the meaning of its actions and every
+localized text. They add no state management and no
+orchestration of loading, empty, error or ready states.
+
+Both widgets take the maximum width allowed by their
+parent, which must provide a bounded width.
+
+### 8.1 CbsStatePanel
+
+CbsStatePanel is a full-width surface that frames the
+content of a presentation state.
+
+Example:
+
+    CbsStatePanel(
+      child: Text(
+        'Nothing to show yet.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    );
+
+Parameters:
+
+- child: required content.
+- key: optional Flutter widget key.
+
+Rendering: full width, 24 logical pixels of padding
+(CbsSpacing.lg), 16 logical pixels of corner radius
+(CbsRadius.lg) and the surfaceContainerHighest color of the
+active Material 3 color scheme. It adds no semantics.
+
+The surface is a DecoratedBox rather than Card.filled:
+Card.filled adds a 4 pixel margin, a 12 pixel radius, a
+Material layer and a semantic container, and reads
+its color, elevation, clipping and margin from the
+application's CardTheme. CbsStatePanel is independent
+from CardTheme.
+
+### 8.2 CbsRetryMessage
+
+CbsRetryMessage shows an error message followed by a retry
+button, aligned to the start and separated by 8 logical
+pixels (CbsSpacing.sm). It composes CbsFeedbackMessage
+(type error, expand true) and CbsButton.
+
+Example:
+
+    CbsRetryMessage(
+      message: 'Unable to load the content.',
+      retryLabel: 'Retry',
+      onRetry: controller.load,
+    );
+
+Parameters:
+
+- message: required visible error message.
+- retryLabel: required visible button label.
+- onRetry: required callback of the retry button.
+- semanticLabel: optional accessible description of the
+  error message. It does not change the button semantics.
+- key: optional Flutter widget key.
+
+The framework contains no text: message, retryLabel and
+semanticLabel are provided by the consuming application in
+its current language. A key set on CbsRetryMessage identifies
+the whole widget, not the inner button.
+
+## 9. Accessibility
 
 Automated tests cover initial accessibility contracts,
 including semantic labels, disabled button state
-and keyboard activation.
+and keyboard activation, and the semantics of
+CbsStatePanel and CbsRetryMessage.
 
 Manual TalkBack and VoiceOver validation remains
 a separate qualification activity.
 
-## 9. Qualification
+## 10. Qualification
 
 The current CBS Flutter toolchain is version 3.47.6.
 
@@ -324,7 +413,7 @@ From the package directory, run:
 
     ~/.cbs/toolchains/flutter/3.47.6/bin/flutter test
 
-## 10. Reuse principles
+## 11. Reuse principles
 
 The package must remain independent from AMH-USR
 and other consuming applications.
@@ -338,7 +427,7 @@ New components should:
 5. Preserve compatibility.
 6. Be qualified before publication.
 
-## 11. Current limitations
+## 12. Current limitations
 
 Version 0.1.0 does not yet provide:
 

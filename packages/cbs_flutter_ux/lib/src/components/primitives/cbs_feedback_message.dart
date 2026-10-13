@@ -12,6 +12,7 @@ class CbsFeedbackMessage extends StatelessWidget {
     required this.message,
     this.type = CbsFeedbackType.info,
     this.semanticLabel,
+    this.expand = false,
     super.key,
   });
 
@@ -23,11 +24,19 @@ class CbsFeedbackMessage extends StatelessWidget {
   /// Provided by the consuming application in its current language.
   final String? semanticLabel;
 
+  /// Whether the message takes the maximum width allowed by its parent.
+  ///
+  /// When false (default), the message is as wide as its content.
+  /// When true, the message fills the available width; the parent must
+  /// provide a bounded width.
+  final bool expand;
+
   @override
   Widget build(BuildContext context) {
     final style = CbsFeedbackStyle.resolve(Theme.of(context).colorScheme, type);
 
     final content = Container(
+      width: expand ? double.infinity : null,
       padding: const EdgeInsets.all(CbsSpacing.md),
       decoration: BoxDecoration(
         color: style.background,

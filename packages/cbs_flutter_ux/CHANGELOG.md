@@ -3,6 +3,36 @@
 All notable changes to the CBS Flutter UX/UI package
 are documented in this file.
 
+## Unreleased - D03b-B Lot 1 presentation states
+
+### Added
+
+- CbsFeedbackMessage.expand: optional, defaults to false. When
+  true, the message takes the maximum width allowed by its parent.
+- CbsStatePanel: presentation-only full-width surface for the
+  content of a presentation state (padding 24, radius 16,
+  surfaceContainerHighest). Built on DecoratedBox, independent
+  from CardTheme.
+- CbsRetryMessage: error CbsFeedbackMessage followed by a
+  CbsButton, with an 8 pixel vertical gap. All texts are provided
+  by the consumer.
+- Automated tests for the new widgets, covering Essentials and
+  Branded, light and dark themes, widths 320 to 1280, text scales
+  1 and 2, semantics and interactions.
+
+### Compatibility
+
+- No public symbol removed or renamed.
+- CbsFeedbackMessage behavior is unchanged when expand is omitted.
+- No dependency added.
+
+### Limitations
+
+- Visual qualification (Golden, TalkBack, VoiceOver, runtime) is
+  not covered by this change.
+- A key set on CbsRetryMessage identifies the whole widget, not
+  the inner retry button.
+
 ## Unreleased - D03b-A graphic foundations
 
 ### Added

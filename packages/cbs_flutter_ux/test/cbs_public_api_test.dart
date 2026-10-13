@@ -2,6 +2,8 @@ import 'package:cbs_flutter_ux/cbs_flutter_ux.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+void _noop() {}
+
 /// Guards the public contract existing before D03b-A.
 ///
 /// Each reference below fails to compile if the symbol is removed or
@@ -44,5 +46,28 @@ void main() {
 
   test('preserves the Essentials seed color', () {
     expect(CbsThemeConfig.essentialsSeedColor, Colors.indigo);
+  });
+
+  test('exposes the D03b-B Lot 1 additions', () {
+    // CbsFeedbackMessage.expand: optional, defaults to false.
+    const CbsFeedbackMessage(message: 'Message');
+    const CbsFeedbackMessage(message: 'Message', expand: true);
+    expect(const CbsFeedbackMessage(message: 'Message').expand, isFalse);
+
+    // CbsStatePanel: child only.
+    const CbsStatePanel(child: SizedBox());
+
+    // CbsRetryMessage: message, retryLabel, onRetry; semanticLabel optional.
+    const CbsRetryMessage(
+      message: 'Message',
+      retryLabel: 'Retry',
+      onRetry: _noop,
+    );
+    const CbsRetryMessage(
+      message: 'Message',
+      retryLabel: 'Retry',
+      onRetry: _noop,
+      semanticLabel: 'Error: Message',
+    );
   });
 }
