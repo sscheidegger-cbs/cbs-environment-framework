@@ -2,9 +2,17 @@ import 'package:cbs_flutter_ux/cbs_flutter_ux.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cbs_flutter_ux_example/catalog/catalog_keys.dart';
+import 'package:cbs_flutter_ux_example/catalog/catalog_scenario.dart';
 import 'package:cbs_flutter_ux_example/main.dart';
 
+import 'catalog_test_helpers.dart';
+
 void main() {
+  // D03b-C.2 adaptation: the theme switch is now the `Design` selection
+  // control, and the page scrollable is identified by a stable key because
+  // the simulated viewport adds a nested horizontal scrollable.
+  // Every functional assertion of the CURRENT test is preserved.
   testWidgets('Showcase displays Essentials and Branded themes', (
     tester,
   ) async {
@@ -24,34 +32,32 @@ void main() {
       await tester.scrollUntilVisible(
         find.text(message),
         150,
-        scrollable: find.byType(Scrollable),
+        scrollable: pageScrollable(),
       );
       expect(find.text(message), findsOneWidget);
     }
 
     await tester.scrollUntilVisible(
-      find.byType(SwitchListTile),
+      find.byKey(CatalogKeys.designOption(CatalogDesign.branded)),
       -150,
-      scrollable: find.byType(Scrollable),
+      scrollable: pageScrollable(),
     );
 
-    final essentialsTheme = tester
-        .widget<MaterialApp>(find.byType(MaterialApp))
-        .theme!;
+    final essentialsTheme = appTheme(tester);
 
     expect(
       essentialsTheme.colorScheme.primary,
       CbsTheme.essentials().colorScheme.primary,
     );
 
-    await tester.tap(find.byType(SwitchListTile));
+    await tester.tap(
+      find.byKey(CatalogKeys.designOption(CatalogDesign.branded)),
+    );
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Branded / Teal'), findsOneWidget);
 
-    final brandedTheme = tester
-        .widget<MaterialApp>(find.byType(MaterialApp))
-        .theme!;
+    final brandedTheme = appTheme(tester);
 
     expect(
       brandedTheme.colorScheme.primary,
@@ -77,15 +83,15 @@ void main() {
       await tester.scrollUntilVisible(
         find.text(message),
         150,
-        scrollable: find.byType(Scrollable),
+        scrollable: pageScrollable(),
       );
       expect(find.text(message), findsOneWidget);
     }
 
     await tester.scrollUntilVisible(
-      find.byType(SwitchListTile),
+      find.byKey(CatalogKeys.designOption(CatalogDesign.branded)),
       -150,
-      scrollable: find.byType(Scrollable),
+      scrollable: pageScrollable(),
     );
   });
 }
