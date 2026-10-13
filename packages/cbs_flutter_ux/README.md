@@ -31,6 +31,8 @@ The package provides:
 - Presentation-state patterns (state panel, retry message).
 - Visual parts (section heading).
 - Automated Flutter tests.
+- A visual catalog application (see section 11.2),
+  located in example/.
 
 The package does not provide application-specific
 screens, navigation or business workflows.
@@ -446,20 +448,131 @@ and keyboard activation, and the semantics of
 CbsStatePanel, CbsRetryMessage and the header semantics
 of CbsSectionHeading.
 
-Manual TalkBack and VoiceOver validation remains
-a separate qualification activity.
+The visual catalog tests (section 11.2) additionally check,
+on the catalog demonstrations, the semantics of the disabled
+button (no tap action), the semantics of the retry button
+(enabled, with a tap action), the header semantics of the
+section headings and the semantic labels of the loading and
+feedback demonstrations.
+
+These are headless widget tests. Manual TalkBack and
+VoiceOver validation remains a separate qualification
+activity and has not been performed.
 
 ## 11. Qualification
 
 The current CBS Flutter toolchain is version 3.47.6.
 
-From the package directory, run:
+### 11.1 Package
+
+From the package directory (packages/cbs_flutter_ux), run:
 
     ~/.cbs/toolchains/flutter/3.47.6/bin/flutter analyze
 
     ~/.cbs/toolchains/flutter/3.47.6/bin/flutter test
 
+### 11.2 Visual catalog
+
+The package ships a visual catalog: a standalone Flutter
+application located in packages/cbs_flutter_ux/example/.
+It belongs to cbs-environment-framework and has no dependency
+on AMH-USR, on authentication or on any backend service.
+It depends only on Flutter and on this package
+(path dependency ../).
+
+Role: the catalog displays every public CBS widget in the
+same place and lets a developer or a reviewer check how it
+renders under several configurations, independently of any
+consuming application. It is a qualification aid for the
+Visual Parts and presentation-state patterns. It is not a
+distribution channel: the catalog code is not part of the
+public API of cbs_flutter_ux.
+
+Components shown (the six public widgets):
+
+- CbsButton
+- CbsLoadingIndicator
+- CbsFeedbackMessage
+- CbsStatePanel
+- CbsRetryMessage
+- CbsSectionHeading
+
+CbsTheme, CbsThemeConfig and the tokens are exercised
+through the theme applied to these widgets; the catalog has
+no dedicated token or palette visualization.
+
+Application states: a seventh section composes the four
+presentation states Loading, Empty, Error and Ready from
+the widgets above. These compositions are built by the
+example, as a consumer would build them: CbsStatePanel,
+CbsLoadingIndicator, CbsSectionHeading, CbsRetryMessage and
+CbsButton, with plain Flutter widgets for the remaining
+text. The package provides no state controller, no state
+model and no widget orchestrating these four states.
+
+Scenario controls (located above the preview, outside the
+simulated viewport):
+
+- Design: Essentials (indigo) or Branded (teal,
+  buttonRadius CbsRadius.lg).
+- Appearance: Light or Dark.
+- Width: 320, 600, 840 or 1280 logical pixels.
+- Text scale: x1 or x2.
+
+The four controls combine into 2 x 2 x 4 x 2 = 32 scenarios.
+The catalog starts on Essentials, Light, 320 px, text x1.
+
+Commands, from packages/cbs_flutter_ux/example:
+
+    ~/.cbs/toolchains/flutter/3.47.6/bin/flutter pub get
+
+    ~/.cbs/toolchains/flutter/3.47.6/bin/flutter analyze
+
+    ~/.cbs/toolchains/flutter/3.47.6/bin/flutter test
+
+    ~/.cbs/toolchains/flutter/3.47.6/bin/flutter devices
+
+    ~/.cbs/toolchains/flutter/3.47.6/bin/flutter run -d <device-id> -t lib/main.dart
+
+The example only contains an android/ platform. A running
+Android device or emulator is required for flutter run;
+none is assumed. Architecture, how to add a section and the
+detailed limits are described in example/README.md.
+
+Automated qualification of the catalog (headless widget
+tests, no device): the six components and the four states
+are present; the 32 scenarios are built without exception
+and without overflow, including 320 px with text x2; the
+simulated MediaQuery width and the layout constraints agree;
+the button and the retry interactions work in every
+scenario; the theme received by the displayed widgets is the
+selected CBS theme.
+
+Limits of this qualification:
+
+- MediaQuery is simulated partially (M3). Only size
+  (width, with the real device height) and textScaler are
+  replaced. padding and viewInsets come from the real device
+  and are not simulated. orientation is derived by Flutter
+  from the simulated size and cannot be set independently.
+
+
+- The text scale is absolute (M5). x1 and x2 are simulation
+  values that replace the text scaler: they do not combine
+  with, and do not reflect, the system font size configured
+  on the device.
+- Tests are headless widget tests: they are not proof of a
+  real Android rendering.
+- No Golden test exists.
+- No TalkBack or VoiceOver validation has been performed.
+- Only the Android platform is generated for the example;
+  Linux and Web are not generated.
+- No Android runtime run of the catalog is recorded by this
+  documentation.
+
 ## 12. Reuse principles
+
+Independence from AMH-USR was verified by inspection of imports and dependencies; no dedicated automated non-coupling test exists.
 
 The package must remain independent from AMH-USR
 and other consuming applications.
@@ -477,10 +590,32 @@ New components should:
 
 Version 0.1.0 does not yet provide:
 
-- A complete component catalog.
-- A visual component showcase.
+- A complete set of components: CbsCard is deferred until
+  after E09; a media part, semantic iconography, collection
+  components and a description or action on CbsSectionHeading
+  are deferred.
 - Signature-specific configurations.
-- Automated cross-device visual qualification.
+- Cross-device visual qualification.
 - Distribution through pub.dev.
 
+A visual catalog of the six public widgets and of the four
+presentation states is available in example/ (section 11.2).
+
+Status of the visual qualification:
+
+- Covered by D03b-C: standalone catalog, six components,
+  four application states, 32 scenarios (design, appearance,
+  width, text scale), headless widget tests, no dependency
+  on AMH-USR services.
+- Not covered: Android rendering proof, Golden tests,
+  TalkBack and VoiceOver validation, independent simulation
+  of padding, viewInsets and orientation, system text scale
+  of the device, Linux and Web platforms.
+- Deferred to D03c: Golden tests, TalkBack and VoiceOver on
+  devices, multi-device runtime. An Android run of the catalog
+  is to be qualified separately.
+- Deferred until after E09: CbsCard.
+
 These capabilities may be introduced progressively.
+No deferred capability is considered available
+until its implementation and qualification are complete.

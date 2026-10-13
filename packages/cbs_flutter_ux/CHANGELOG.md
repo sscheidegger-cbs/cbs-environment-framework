@@ -3,6 +3,60 @@
 All notable changes to the CBS Flutter UX/UI package
 are documented in this file.
 
+## Unreleased - D03b-C visual catalog
+
+### Added
+
+- D03b-C.2 infrastructure (example/ only): CatalogScenario and its
+  four selection dimensions, CatalogControls, CatalogPreviewFrame
+  (simulated viewport with a tight width and a MediaQuery carrying
+  the simulated size and text scaler), CatalogEntry and an explicit
+  list of sections, CatalogKeys. Controls for Essentials or
+  Branded, Light or Dark, widths 320, 600, 840 and 1280 px, and text
+  scale x1 or x2: 32 scenarios.
+- D03b-C.3 content (example/ only): sections for the six public
+  widgets (CbsButton, CbsLoadingIndicator, CbsFeedbackMessage,
+  CbsStatePanel, CbsRetryMessage, CbsSectionHeading) with
+  representative variants, and a section composing the four
+  application states Loading, Empty, Error and Ready from CBS
+  widgets. Retry and button demonstrations are interactive and show
+  a visible counter.
+- D03b-C.2 and C.3 automated tests (example/test): scenario model
+  and controls, simulated viewport and MediaQuery / constraints
+  consistency, effective theme received by the displayed widgets,
+  presence of the six components and of the four states, button and
+  retry interactions, and a matrix over the 32 scenarios checking
+  for exceptions and overflow, including 320 px with text x2. The
+  test of the demonstration that existed before the catalog is
+  preserved and adapted to stable keys.
+
+### Documentation
+
+- D03b-C.4: README of the package updated (catalog description,
+  commands, qualification limits). The section on current
+  limitations no longer states that a visual showcase is missing.
+- D03b-C.4: README of example/ rewritten (purpose, architecture,
+  components, four states, controls, commands with the CBS Flutter
+  3.47.6 toolchain, how to add a section, known limits).
+- Limits documented: MediaQuery simulated partially (size and
+  textScaler only); absolute text scale (x1 and x2 do not reflect the
+  device system setting); headless widget tests; no Android runtime
+  proof; no Golden test; no TalkBack or VoiceOver validation; no
+  Linux or Web platform; CbsCard deferred until after E09.
+
+### Compatibility
+
+- No change in lib/ and no public symbol added, removed or renamed.
+- No pubspec.yaml change and no dependency added.
+- The catalog has no dependency on AMH-USR or on any backend service.
+
+### Limitations
+
+- Visual qualification (Golden, TalkBack, VoiceOver, Android runtime,
+  multi-device runtime) is not covered by this change. Golden and
+  assistive-technology validation on devices are planned for D03c;
+  an Android run of the catalog is to be qualified separately.
+
 ## Unreleased - D03b-B Lot 2 section heading
 
 ### Added
