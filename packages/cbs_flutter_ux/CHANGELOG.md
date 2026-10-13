@@ -3,6 +3,33 @@
 All notable changes to the CBS Flutter UX/UI package
 are documented in this file.
 
+## Unreleased - D03b-B Lot 2 section heading
+
+### Added
+
+- CbsSectionHeading: presentation-only section title. A single
+  Text in the titleMedium style of the active theme with a w700
+  weight, wrapped in Semantics(header: true). Title only: no
+  style parameter, description, action or built-in spacing.
+- Automated tests covering the displayed title, header semantics,
+  Essentials and Branded styles, light and dark themes, width 320
+  with text scale 2, long titles without overflow, absence of
+  external spacing and equivalence with a reproduction of the CURRENT
+  AMH-USR Home section headings (Featured, Categories, Nearby, Upcoming).
+
+### Compatibility
+
+- No public symbol removed or renamed.
+- No existing behavior changed.
+- No dependency added.
+
+### Limitations
+
+- Visual qualification (Golden, TalkBack, VoiceOver, runtime) is
+  not covered by this change.
+- The 8 pixel gap that follows the heading in Home remains in the
+  consumer layout and is not part of CbsSectionHeading.
+
 ## Unreleased - D03b-B Lot 1 presentation states
 
 ### Added

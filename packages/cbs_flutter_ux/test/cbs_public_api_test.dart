@@ -70,4 +70,11 @@ void main() {
       semanticLabel: 'Error: Message',
     );
   });
+
+  test('exposes the D03b-B Lot 2 addition', () {
+    // CbsSectionHeading: title only.
+    const CbsSectionHeading(title: 'Title');
+    const CbsSectionHeading(title: 'Title', key: ValueKey('heading'));
+    expect(const CbsSectionHeading(title: 'Title').title, 'Title');
+  });
 }

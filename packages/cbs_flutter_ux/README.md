@@ -29,6 +29,7 @@ The package provides:
 - Typed feedback style.
 - Reusable UI primitives.
 - Presentation-state patterns (state panel, retry message).
+- Visual parts (section heading).
 - Automated Flutter tests.
 
 The package does not provide application-specific
@@ -63,6 +64,10 @@ Available presentation-state patterns:
 
 - CbsStatePanel
 - CbsRetryMessage
+
+Available visual parts:
+
+- CbsSectionHeading
 
 Consumers must use the public entry point
 rather than importing internal files from lib/src.
@@ -393,17 +398,58 @@ semanticLabel are provided by the consuming application in
 its current language. A key set on CbsRetryMessage identifies
 the whole widget, not the inner button.
 
-## 9. Accessibility
+## 9. Visual parts
+
+### 9.1 CbsSectionHeading
+
+CbsSectionHeading displays the title of a content section
+and exposes it to assistive technologies as a heading
+(Semantics with header set to true).
+
+Example:
+
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CbsSectionHeading(title: sectionTitle),
+        const SizedBox(height: CbsSpacing.sm),
+        content,
+      ],
+    );
+
+Parameters:
+
+- title: required visible title.
+- key: optional Flutter widget key.
+
+Rendering: a single Text using the titleMedium style of the
+active theme with a w700 weight. It follows Essentials and
+Branded typography, light and dark appearance, and the text
+scale of the device. Under a loose width constraint the text is as
+wide as its content; under a tight constraint (for example
+CrossAxisAlignment.stretch) it takes the constrained width.
+It wraps when the parent width is bounded.
+
+The heading has no other parameter: no style override, no
+description and no action. It adds no spacing of its own:
+the consuming application places it and separates it from the
+content that follows, for example with CbsSpacing.sm as above.
+
+The framework contains no text: title is provided by the
+consuming application in its current language.
+
+## 10. Accessibility
 
 Automated tests cover initial accessibility contracts,
 including semantic labels, disabled button state
 and keyboard activation, and the semantics of
-CbsStatePanel and CbsRetryMessage.
+CbsStatePanel, CbsRetryMessage and the header semantics
+of CbsSectionHeading.
 
 Manual TalkBack and VoiceOver validation remains
 a separate qualification activity.
 
-## 10. Qualification
+## 11. Qualification
 
 The current CBS Flutter toolchain is version 3.47.6.
 
@@ -413,7 +459,7 @@ From the package directory, run:
 
     ~/.cbs/toolchains/flutter/3.47.6/bin/flutter test
 
-## 11. Reuse principles
+## 12. Reuse principles
 
 The package must remain independent from AMH-USR
 and other consuming applications.
@@ -427,7 +473,7 @@ New components should:
 5. Preserve compatibility.
 6. Be qualified before publication.
 
-## 12. Current limitations
+## 13. Current limitations
 
 Version 0.1.0 does not yet provide:
 
