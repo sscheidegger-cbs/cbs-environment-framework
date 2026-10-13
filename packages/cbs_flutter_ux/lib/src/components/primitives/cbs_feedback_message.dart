@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Severity levels supported by a CBS feedback message.
-enum CbsFeedbackType { info, success, warning, error }
+import '../../foundation/theme/cbs_feedback_style.dart';
+import '../../foundation/tokens/cbs_radius.dart';
+import '../../foundation/tokens/cbs_spacing.dart';
+
+export '../../foundation/theme/cbs_feedback_style.dart' show CbsFeedbackType;
 
 /// Reusable feedback message for CBS Flutter applications.
 class CbsFeedbackMessage extends StatelessWidget {
@@ -22,44 +25,21 @@ class CbsFeedbackMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final (Color background, Color foreground, IconData icon) = switch (type) {
-      CbsFeedbackType.info => (
-        colorScheme.primaryContainer,
-        colorScheme.onPrimaryContainer,
-        Icons.info_outline,
-      ),
-      CbsFeedbackType.success => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
-        Icons.check_circle_outline,
-      ),
-      CbsFeedbackType.warning => (
-        colorScheme.tertiaryContainer,
-        colorScheme.onTertiaryContainer,
-        Icons.warning_amber_outlined,
-      ),
-      CbsFeedbackType.error => (
-        colorScheme.errorContainer,
-        colorScheme.onErrorContainer,
-        Icons.error_outline,
-      ),
-    };
+    final style = CbsFeedbackStyle.resolve(Theme.of(context).colorScheme, type);
 
     final content = Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(CbsSpacing.md),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(8),
+        color: style.background,
+        borderRadius: BorderRadius.circular(CbsRadius.md),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: foreground),
-          const SizedBox(width: 8),
+          Icon(style.icon, color: style.foreground),
+          const SizedBox(width: CbsSpacing.sm),
           Flexible(
-            child: Text(message, style: TextStyle(color: foreground)),
+            child: Text(message, style: TextStyle(color: style.foreground)),
           ),
         ],
       ),

@@ -24,6 +24,9 @@ The package provides:
 - Essentials and Branded configurations.
 - Shared spacing tokens.
 - Shared corner-radius tokens.
+- Shared elevation, icon size, motion and breakpoint tokens.
+- Typed theme configuration.
+- Typed feedback style.
 - Reusable UI primitives.
 - Automated Flutter tests.
 
@@ -40,8 +43,14 @@ Available foundations:
 
 - CbsFlutterUx
 - CbsTheme
+- CbsThemeConfig
 - CbsSpacing
 - CbsRadius
+- CbsElevation
+- CbsIconSize
+- CbsMotion
+- CbsBreakpoints
+- CbsFeedbackStyle
 
 Available primitives:
 
@@ -146,6 +155,64 @@ Corner-radius tokens are available through CbsRadius.
 Example:
 
     BorderRadius.circular(CbsRadius.md);
+
+Elevation tokens are available through CbsElevation
+and follow the Material 3 elevation levels.
+
+Icon size tokens are available through CbsIconSize.
+
+Motion tokens are available through CbsMotion.
+Durations and easing curves reuse the Material 3
+motion system.
+
+Example:
+
+    AnimatedContainer(
+      duration: CbsMotion.medium,
+      curve: CbsMotion.standard,
+    );
+
+Width breakpoints are available through CbsBreakpoints
+and follow the Material 3 window size classes.
+
+Example:
+
+    final sizeClass = CbsBreakpoints.classify(
+      MediaQuery.sizeOf(context).width,
+    );
+
+### 6.1 Typed theme configuration
+
+CbsThemeConfig describes a theme with typed values.
+CbsTheme.fromConfig builds the corresponding Material 3 theme.
+
+Example:
+
+    MaterialApp(
+      theme: CbsTheme.fromConfig(
+        const CbsThemeConfig(
+          seedColor: Colors.green,
+          buttonRadius: CbsRadius.lg,
+        ),
+      ),
+      home: const Scaffold(),
+    );
+
+CbsTheme.essentials and CbsTheme.branded keep their
+signatures and produce the same themes as before.
+
+### 6.2 Feedback style
+
+CbsFeedbackStyle.resolve returns the background color,
+foreground color and icon of a CbsFeedbackType
+for a given Material 3 color scheme.
+
+Example:
+
+    final style = CbsFeedbackStyle.resolve(
+      Theme.of(context).colorScheme,
+      CbsFeedbackType.success,
+    );
 
 ## 7. UI primitives
 

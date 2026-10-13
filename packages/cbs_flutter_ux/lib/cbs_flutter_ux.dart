@@ -6,9 +6,15 @@ library;
 export 'src/components/primitives/cbs_button.dart';
 export 'src/components/primitives/cbs_feedback_message.dart';
 export 'src/components/primitives/cbs_loading_indicator.dart';
+export 'src/foundation/theme/cbs_feedback_style.dart';
+export 'src/foundation/theme/cbs_theme.dart';
+export 'src/foundation/theme/cbs_theme_config.dart';
+export 'src/foundation/tokens/cbs_breakpoints.dart';
+export 'src/foundation/tokens/cbs_elevation.dart';
+export 'src/foundation/tokens/cbs_icon_size.dart';
+export 'src/foundation/tokens/cbs_motion.dart';
 export 'src/foundation/tokens/cbs_radius.dart';
 export 'src/foundation/tokens/cbs_spacing.dart';
-export 'src/foundation/theme/cbs_theme.dart';
 
 /// Public identity of the CBS Flutter UX/UI framework.
 ///

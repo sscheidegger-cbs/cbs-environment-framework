@@ -3,6 +3,37 @@
 All notable changes to the CBS Flutter UX/UI package
 are documented in this file.
 
+## Unreleased - D03b-A graphic foundations
+
+### Added
+
+- CbsThemeConfig typed theme configuration.
+- CbsTheme.fromConfig factory.
+- CbsFeedbackStyle typed feedback style resolved from
+  the Material 3 color scheme.
+- CbsElevation tokens (Material 3 levels).
+- CbsIconSize tokens.
+- CbsMotion tokens (Material 3 durations and easing).
+- CbsBreakpoints tokens and CbsWindowSizeClass
+  (Material 3 window size classes).
+- Automated tests for the new foundations and for
+  public API backward compatibility.
+
+### Changed
+
+- CbsTheme.essentials and CbsTheme.branded now delegate
+  to CbsTheme.fromConfig. Signatures and resulting
+  themes are unchanged.
+- CbsFeedbackMessage uses CbsFeedbackStyle, CbsSpacing and
+  CbsRadius. Rendered values are unchanged.
+- CbsFeedbackType is declared in the foundation layer and
+  remains exported from the public entry point.
+
+### Compatibility
+
+- No public symbol removed or renamed.
+- No dependency added.
+
 ## 0.1.0 - Initial development version
 
 ### Added
