@@ -12,11 +12,16 @@ import 'catalog_test_helpers.dart';
 // tests assert the theme the previewed CBS components really receive, read
 // with `Theme.of(context)` from the context of each component.
 
-/// Public CBS widgets of the CURRENT demonstrations.
+/// Public CBS widgets previewed by the catalog.
+///
+/// D03b-C.3: the three CURRENT widgets plus the three added ones.
 final _previewedComponents = <String, Finder>{
   'CbsButton': find.byType(CbsButton),
   'CbsLoadingIndicator': find.byType(CbsLoadingIndicator),
   'CbsFeedbackMessage': find.byType(CbsFeedbackMessage),
+  'CbsStatePanel': find.byType(CbsStatePanel),
+  'CbsRetryMessage': find.byType(CbsRetryMessage),
+  'CbsSectionHeading': find.byType(CbsSectionHeading),
 };
 
 /// Theme expected for [design] and [brightness], built independently of
@@ -38,15 +43,18 @@ void _expectEffectiveTheme(WidgetTester tester, ThemeData expected) {
       in _previewedComponents.entries) {
     expect(finder, findsWidgets, reason: name);
 
-    final theme = effectiveTheme(tester, finder);
-    expect(theme.colorScheme, expected.colorScheme, reason: '$name colors');
-    expect(
-      theme.colorScheme.brightness,
-      expected.colorScheme.brightness,
-      reason: '$name brightness',
-    );
-    expect(theme.brightness, expected.brightness, reason: '$name brightness');
-    expect(theme.useMaterial3, expected.useMaterial3, reason: '$name M3');
+    // Every instance, not only the first one: sections add instances.
+    for (final element in tester.elementList(finder)) {
+      final theme = Theme.of(element);
+      expect(theme.colorScheme, expected.colorScheme, reason: '$name colors');
+      expect(
+        theme.colorScheme.brightness,
+        expected.colorScheme.brightness,
+        reason: '$name brightness',
+      );
+      expect(theme.brightness, expected.brightness, reason: '$name brightness');
+      expect(theme.useMaterial3, expected.useMaterial3, reason: '$name M3');
+    }
   }
 
   // Every component sees the same theme as the preview content itself.

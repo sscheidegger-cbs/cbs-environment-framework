@@ -17,16 +17,40 @@ const _currentFeedbackMessages = [
   'Error message',
 ];
 
+/// CURRENT demonstrations, each scoped to its own labelled demo.
+///
+/// D03b-C.3 adaptation: global widget counts (`CbsButton` = 2, ...) were
+/// replaced by counts scoped to the CURRENT demos, because the new sections
+/// add instances of the same widgets. Every CURRENT assertion is kept.
 void _expectCurrentDemonstrations() {
-  expect(find.byType(CbsButton), findsNWidgets(2));
+  expect(inDemo('buttons-states', find.byType(CbsButton)), findsNWidgets(2));
   expect(find.text('Enabled action'), findsOneWidget);
   expect(find.text('Disabled action'), findsOneWidget);
-  expect(find.byType(CbsLoadingIndicator), findsNWidgets(2));
+  expect(
+    inDemo('loading-states', find.byType(CbsLoadingIndicator)),
+    findsNWidgets(2),
+  );
   expect(find.text('Indeterminate'), findsOneWidget);
   expect(find.text('Determinate - 60 %'), findsOneWidget);
-  expect(find.byType(CbsFeedbackMessage), findsNWidgets(4));
+  expect(
+    inDemo('feedback-types', find.byType(CbsFeedbackMessage)),
+    findsNWidgets(4),
+  );
   for (final message in _currentFeedbackMessages) {
     expect(find.text(message), findsOneWidget);
+  }
+}
+
+/// The six public CBS components and the four application states.
+void _expectNewContent() {
+  expect(find.byType(CbsButton), findsWidgets);
+  expect(find.byType(CbsLoadingIndicator), findsWidgets);
+  expect(find.byType(CbsFeedbackMessage), findsWidgets);
+  expect(find.byType(CbsStatePanel), findsWidgets);
+  expect(find.byType(CbsRetryMessage), findsWidgets);
+  expect(find.byType(CbsSectionHeading), findsWidgets);
+  for (final state in ['loading', 'empty', 'error', 'ready']) {
+    expect(find.byKey(CatalogKeys.demo('state-$state')), findsOneWidget);
   }
 }
 
@@ -101,12 +125,21 @@ void main() {
 
   group('catalog entries', () {
     test('lists the CURRENT demonstrations with unique identifiers', () {
-      expect(catalogEntries.map((e) => e.id), [
+      final ids = catalogEntries.map((e) => e.id).toList();
+
+      // The three CURRENT entries keep their identifiers and their order;
+      // D03b-C.3 appends the three missing components and the states.
+      expect(ids.take(3), ['buttons', 'loading', 'feedback']);
+      expect(ids, [
         'buttons',
         'loading',
         'feedback',
+        'state-panel',
+        'retry-message',
+        'section-heading',
+        'application-states',
       ]);
-      expect(catalogEntries.map((e) => e.id).toSet(), hasLength(3));
+      expect(ids.toSet(), hasLength(ids.length));
     });
 
     testWidgets('renders one keyed section per entry, in order', (
@@ -427,7 +460,9 @@ void main() {
       await tester.pumpWidget(const CbsUxShowcase());
 
       final buttons = tester
-          .widgetList<CbsButton>(find.byType(CbsButton))
+          .widgetList<CbsButton>(
+            inDemo('buttons-states', find.byType(CbsButton)),
+          )
           .toList();
       expect(buttons.where((b) => b.onPressed != null), hasLength(1));
       expect(buttons.where((b) => b.onPressed == null), hasLength(1));
@@ -437,7 +472,9 @@ void main() {
       await tester.pumpWidget(const CbsUxShowcase());
 
       final indicators = tester
-          .widgetList<CbsLoadingIndicator>(find.byType(CbsLoadingIndicator))
+          .widgetList<CbsLoadingIndicator>(
+            inDemo('loading-states', find.byType(CbsLoadingIndicator)),
+          )
           .toList();
       expect(indicators.map((i) => i.value), [null, 0.6]);
       expect(indicators.map((i) => i.semanticLabel), [
@@ -451,7 +488,9 @@ void main() {
 
       expect(
         tester
-            .widgetList<CbsFeedbackMessage>(find.byType(CbsFeedbackMessage))
+            .widgetList<CbsFeedbackMessage>(
+              inDemo('feedback-types', find.byType(CbsFeedbackMessage)),
+            )
             .map((m) => m.type),
         [
           CbsFeedbackType.info,
@@ -489,6 +528,7 @@ void main() {
           scenario.summary,
         );
         _expectCurrentDemonstrations();
+        _expectNewContent();
         expect(tester.takeException(), isNull);
       });
     }

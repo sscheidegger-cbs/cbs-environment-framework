@@ -46,4 +46,13 @@ abstract final class CatalogKeys {
 
   /// Section of the catalog identified by [id].
   static Key section(String id) => ValueKey('catalog-section-$id');
+
+  /// Labelled demonstration (a block of a section) identified by [id].
+  static Key demo(String id) => ValueKey('catalog-demo-$id');
+
+  /// Text displaying the interaction counter of the demonstration [id].
+  static Key counter(String id) => ValueKey('catalog-counter-$id');
+
+  /// `CbsRetryMessage` of the retry demonstration [id].
+  static Key retryMessage(String id) => ValueKey('catalog-retry-message-$id');
 }

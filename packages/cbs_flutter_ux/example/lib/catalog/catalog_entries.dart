@@ -1,7 +1,11 @@
 import 'catalog_entry.dart';
+import 'sections/application_states_section.dart';
 import 'sections/buttons_section.dart';
 import 'sections/feedback_section.dart';
 import 'sections/loading_section.dart';
+import 'sections/retry_message_section.dart';
+import 'sections/section_heading_section.dart';
+import 'sections/state_panel_section.dart';
 
 /// Ordered list of the catalog sections.
 ///
@@ -22,5 +26,25 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'feedback',
     title: 'Feedback messages',
     builder: (_) => const FeedbackSection(),
+  ),
+  CatalogEntry(
+    id: 'state-panel',
+    title: 'State panel',
+    builder: (_) => const StatePanelSection(),
+  ),
+  CatalogEntry(
+    id: 'retry-message',
+    title: 'Retry message',
+    builder: (_) => const RetryMessageSection(),
+  ),
+  CatalogEntry(
+    id: 'section-heading',
+    title: 'Section heading',
+    builder: (_) => const SectionHeadingSection(),
+  ),
+  CatalogEntry(
+    id: 'application-states',
+    title: 'Application states',
+    builder: (_) => const ApplicationStatesSection(),
   ),
 ];

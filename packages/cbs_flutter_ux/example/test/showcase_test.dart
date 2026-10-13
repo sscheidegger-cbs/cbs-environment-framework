@@ -13,6 +13,9 @@ void main() {
   // control, and the page scrollable is identified by a stable key because
   // the simulated viewport adds a nested horizontal scrollable.
   // Every functional assertion of the CURRENT test is preserved.
+  // D03b-C.3 adaptation: the global `CbsButton` / `CbsLoadingIndicator`
+  // counts are scoped to the CURRENT demonstrations (`buttons-states`,
+  // `loading-states`) because new sections add instances of both widgets.
   testWidgets('Showcase displays Essentials and Branded themes', (
     tester,
   ) async {
@@ -21,8 +24,11 @@ void main() {
     expect(find.text('Design System Showcase'), findsOneWidget);
     expect(find.text('Essentials / Indigo'), findsOneWidget);
 
-    expect(find.byType(CbsButton), findsNWidgets(2));
-    expect(find.byType(CbsLoadingIndicator), findsNWidgets(2));
+    expect(inDemo('buttons-states', find.byType(CbsButton)), findsNWidgets(2));
+    expect(
+      inDemo('loading-states', find.byType(CbsLoadingIndicator)),
+      findsNWidgets(2),
+    );
     for (final message in [
       'Information message',
       'Success message',
@@ -72,8 +78,11 @@ void main() {
       isNot(essentialsTheme.colorScheme.primary),
     );
 
-    expect(find.byType(CbsButton), findsNWidgets(2));
-    expect(find.byType(CbsLoadingIndicator), findsNWidgets(2));
+    expect(inDemo('buttons-states', find.byType(CbsButton)), findsNWidgets(2));
+    expect(
+      inDemo('loading-states', find.byType(CbsLoadingIndicator)),
+      findsNWidgets(2),
+    );
     for (final message in [
       'Information message',
       'Success message',

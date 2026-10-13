@@ -190,9 +190,15 @@ void main() {
       await tester.pumpWidget(const CbsUxShowcase());
       await selectOption(tester, CatalogKeys.widthOption(CatalogWidth.w1280));
 
+      // D03b-C.3 adaptation: the catalog is now taller than the screen, so
+      // the centre of the preview (used by `tester.drag`) is off-screen.
+      // The drag starts inside the visible top of the preview instead.
+      await tester.ensureVisible(find.byKey(CatalogKeys.previewFrame));
+      await tester.pump();
       final before = tester.getTopLeft(find.byKey(CatalogKeys.previewViewport));
-      await tester.drag(
-        find.byKey(CatalogKeys.previewScroll),
+      await tester.dragFrom(
+        tester.getTopLeft(find.byKey(CatalogKeys.previewScroll)) +
+            const Offset(20, 20),
         const Offset(-2000, 0),
       );
       await tester.pump();

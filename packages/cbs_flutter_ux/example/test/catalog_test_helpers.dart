@@ -1,3 +1,4 @@
+import 'package:cbs_flutter_ux/cbs_flutter_ux.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,25 @@ Finder pageScrollable() => find
       matching: find.byType(Scrollable),
     )
     .first;
+
+/// Widgets matching [matching] inside the labelled demonstration [demoId].
+///
+/// Demonstrations are targeted by `Key` instead of global widget counts, so
+/// that sections can gain instances without breaking unrelated assertions.
+Finder inDemo(String demoId, Finder matching) {
+  return find.descendant(
+    of: find.byKey(CatalogKeys.demo(demoId)),
+    matching: matching,
+  );
+}
+
+/// Widgets matching [matching] inside the catalog section [sectionId].
+Finder inSection(String sectionId, Finder matching) {
+  return find.descendant(
+    of: find.byKey(CatalogKeys.section(sectionId)),
+    matching: matching,
+  );
+}
 
 /// Makes [finder] visible in the page, taps it and lets the theme and
 /// chip animations complete.
@@ -53,12 +73,6 @@ ThemeData appTheme(WidgetTester tester) {
   return tester.widget<MaterialApp>(find.byType(MaterialApp)).theme!;
 }
 
-/// Theme effectively received by the first widget matching [finder], read
-/// with `Theme.of(context)` from that widget's own `BuildContext`.
-ThemeData effectiveTheme(WidgetTester tester, Finder finder) {
-  return Theme.of(tester.element(finder.first));
-}
-
 /// Sets the logical size of the test surface (device pixel ratio 1) and
 /// restores it when the test ends.
 void setSurfaceSize(WidgetTester tester, Size size) {
@@ -70,4 +84,28 @@ void setSurfaceSize(WidgetTester tester, Size size) {
 /// Whether the [ChoiceChip] identified by [key] is selected.
 bool isSelected(WidgetTester tester, Key key) {
   return tester.widget<ChoiceChip>(find.byKey(key)).selected;
+}
+
+/// Makes [finder] visible, taps it and lets the resulting rebuild happen.
+///
+/// Uses a single bounded `pump`, never `pumpAndSettle`: the indeterminate
+/// loading indicators animate forever.
+Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pump();
+  await tester.tap(finder);
+  await tester.pump(const Duration(milliseconds: 100));
+}
+
+/// Text displayed by the counter of the demonstration [id].
+String counterText(WidgetTester tester, String id) {
+  return tester.widget<Text>(find.byKey(CatalogKeys.counter(id))).data!;
+}
+
+/// Retry button of the `CbsRetryMessage` of the retry demonstration [id].
+Finder retryButton(String id) {
+  return find.descendant(
+    of: find.byKey(CatalogKeys.retryMessage(id)),
+    matching: find.byType(CbsButton),
+  );
 }
