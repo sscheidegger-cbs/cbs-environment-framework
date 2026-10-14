@@ -73,7 +73,9 @@ void main() {
         840,
         1280,
       ]);
-      expect(CatalogTextScale.values.map((s) => s.factor), [1, 2]);
+      // D03c-A.2 / F3b: `device` is appended; x1 and x2 are unchanged.
+      expect(CatalogTextScale.values.map((s) => s.factor), [1, 2, null]);
+      expect(CatalogTextScale.simulated.map((s) => s.factor), [1, 2]);
     });
 
     test('enumerates the 2 x 2 x 4 x 2 scenario matrix without duplicates', () {
@@ -517,7 +519,7 @@ void main() {
         );
         expect(
           previewMediaQuery(tester).textScaler.scale(10),
-          10 * scenario.textScale.factor,
+          10 * scenario.textScale.factor!,
         );
         expect(
           appTheme(tester).colorScheme.brightness,

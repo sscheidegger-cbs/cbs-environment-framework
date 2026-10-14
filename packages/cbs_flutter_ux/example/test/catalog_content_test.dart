@@ -27,10 +27,13 @@ const _demoIds = <String>[
   'buttons-interaction',
   'loading-states',
   'loading-range',
+  'loading-no-label',
+  'loading-progress',
   'feedback-types',
   'feedback-expand',
   'feedback-long',
   'feedback-semantic',
+  'feedback-dynamic',
   'state-panel-content',
   'state-panel-constrained',
   'retry-short',
@@ -372,7 +375,7 @@ void main() {
       });
     }
 
-    for (final textScale in CatalogTextScale.values) {
+    for (final textScale in CatalogTextScale.simulated) {
       testWidgets('fills a 200 px parent instead of hugging its short content, '
           '${textScale.label}', (tester) async {
         await _pump(tester, CatalogScenario(textScale: textScale));
@@ -395,7 +398,7 @@ void main() {
             .getMaxIntrinsicWidth(double.infinity);
         final huggingWidth = contentWidth + 2 * CbsSpacing.lg;
         expect(huggingWidth, lessThan(StatePanelSection.constrainedWidth - 20));
-        expect(_size(tester, text).height, lessThan(30 * textScale.factor));
+        expect(_size(tester, text).height, lessThan(30 * textScale.factor!));
 
         // The panel fills the parent anyway.
         expect(_size(tester, panel).width, StatePanelSection.constrainedWidth);

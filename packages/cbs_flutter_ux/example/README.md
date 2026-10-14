@@ -6,7 +6,9 @@ Independent visual catalog of the reusable `cbs_flutter_ux` package.
 
 The catalog displays the six public CBS widgets in one place and lets
 a developer or a reviewer switch between 32 rendering scenarios
-(design, appearance, width and text scale). It is the qualification
+(design, appearance, width and simulated text scale x1 or x2). A
+Device text scale, which follows the device settings, is also offered
+and is not part of those 32 scenarios. It is the qualification
 aid of the Visual Parts and presentation-state patterns of the package.
 
 Independence from AMH-USR was verified by inspection of imports and dependencies; no dedicated automated non-coupling test exists.
@@ -59,14 +61,18 @@ Application and catalog files (all under `lib/`):
 - `catalog/sections/` — one file per section (`buttons_section.dart`,
   `loading_section.dart`, `feedback_section.dart`,
   `state_panel_section.dart`, `retry_message_section.dart`,
-  `section_heading_section.dart`, `application_states_section.dart`)
-  and `retry_demo.dart`, the retry demonstration shared by two sections.
+  `section_heading_section.dart`, `application_states_section.dart`),
+  `retry_demo.dart`, the retry demonstration shared by two sections,
+  and, added in D03c-A.2, `dynamic_feedback_demo.dart` (shown by
+  `feedback_section.dart`) and `dynamic_progress_demo.dart` (shown by
+  `loading_section.dart`).
 
 Tests (under `test/`): `showcase_test.dart` (the demonstration that
 existed before the catalog, adapted), `catalog_scenario_test.dart`,
 `catalog_preview_frame_test.dart`, `catalog_effective_theme_test.dart`,
-`catalog_content_test.dart` and the shared helpers
-`catalog_test_helpers.dart`.
+`catalog_content_test.dart`, `catalog_qualification_demos_test.dart`
+(dynamic feedback, loading without label, dynamic progress, Device text
+scale; D03c-A.2) and the shared helpers `catalog_test_helpers.dart`.
 
 ## The six components
 
@@ -79,10 +85,18 @@ Each component has its own section and labelled demonstrations
   counter that must stay at 0.
 - `CbsLoadingIndicator` — indeterminate and determinate 60 %
   (`loading-states`), determinate bounds 0 % and 100 %
-  (`loading-range`). Semantic labels are provided.
+  (`loading-range`). Semantic labels are provided. For the manual
+  Android / TalkBack qualification (D03c-A.2), two demonstrations are
+  added: an indicator **without** `semanticLabel`, with no replacement
+  label (`loading-no-label`), and a determinate indicator whose
+  progress is set to 0, 25, 50, 75 or 100 % by buttons
+  (`loading-progress`). The progress indicator keeps a constant
+  `semanticLabel` ('Progress'); only its value changes.
 - `CbsFeedbackMessage` — four types (`feedback-types`), `expand`
   false and true (`feedback-expand`), long message (`feedback-long`),
-  semantic label (`feedback-semantic`).
+  semantic label (`feedback-semantic`). For the manual qualification,
+  a message shown and hidden by two buttons (`feedback-dynamic`) lets a
+  reviewer observe whether a screen reader announces its appearance.
 - `CbsStatePanel` — representative content at full width
   (`state-panel-content`), parent limited to 200 px
   (`state-panel-constrained`).
@@ -124,9 +138,16 @@ Essentials, Light, 320 px, text x1.
   (`CbsTheme.branded`, teal, `buttonRadius: CbsRadius.lg`).
 - Appearance: Light or Dark.
 - Width: 320, 600, 840 or 1280 px (simulated width, logical pixels).
-- Text scale: x1 or x2 (simulated, see Known limits).
+- Text scale: x1 or x2 (simulated, see Known limits), or Device. With
+  Device the preview uses the `TextScaler` provided by `MediaQuery`,
+  unchanged, so the font size chosen in the Android settings is
+  applied. The line under the summary shows how a 14 sp font is
+  rendered by the device and by the preview.
 
-2 designs x 2 appearances x 4 widths x 2 text scales = 32 scenarios.
+2 designs x 2 appearances x 4 widths x 2 simulated text scales (x1,
+x2) = 32 scenarios (`CatalogScenario.all`). Device is not part of that
+matrix because its result depends on the device settings; its 16
+combinations are `CatalogScenario.allDeviceTextScale`.
 The line under the controls (`CatalogScenario.summary`) shows the active
 combination, for example `Essentials · Light · 320 px · Text x1`.
 
@@ -212,11 +233,25 @@ Not covered:
   from the simulated size and cannot be set independently.
 
 
-- The text scale is absolute (M5). x1 and x2 are simulation values
-  (`TextScaler.linear(1)` and `TextScaler.linear(2)`) that replace the
-  text scaler of the preview. They do not combine with, and do not
-  necessarily reflect, the system font size configured on the device.
-  The controls above the preview keep the real device text scale.
+- The x1 and x2 text scales are absolute (M5, CURRENT, unchanged).
+  They are simulation values (`TextScaler.linear(1)` and
+  `TextScaler.linear(2)`) that replace the text scaler of the preview.
+  They do not combine with, and do not necessarily reflect, the system
+  font size configured on the device. The Device mode (D03c-A.2) is the
+  one that follows the system font size. The controls above the
+  preview keep the real device text scale.
+- The dynamic feedback, the indicator without label and the dynamic
+  progress are observation aids. They add no `liveRegion` on purpose,
+  and the indicator without label receives no replacement label: the
+  CURRENT behaviour of the widgets is observed, not corrected. They do
+  carry visible text of their own, which a screen reader reads as
+  separate nodes and which a reviewer must take into account: a
+  display counter (dynamic feedback), an explanatory sentence (no
+  label) and, for the dynamic progress, a constant `semanticLabel`
+  'Progress' and a "Progress: n %" readout. The headless tests read the Flutter
+  semantics tree; what TalkBack announces and whether the Android font
+  size changes the catalog on a device stay `NOT_VERIFIED` until
+  observed on a device.
 - The tests are headless widget tests: they are not proof of a real
   Android rendering.
 - No Golden test exists, and none is generated.

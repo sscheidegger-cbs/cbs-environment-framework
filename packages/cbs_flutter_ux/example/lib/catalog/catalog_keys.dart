@@ -10,6 +10,10 @@ abstract final class CatalogKeys {
   /// Text summarizing the active scenario.
   static const Key scenarioSummary = ValueKey('catalog-scenario-summary');
 
+  /// Text showing how the device and the preview render a reference font
+  /// size (D03c-A.2 / F3b).
+  static const Key textScaleReadout = ValueKey('catalog-text-scale-readout');
+
   /// Text describing the active design.
   static const Key designDescription = ValueKey('catalog-design-description');
 
@@ -55,4 +59,22 @@ abstract final class CatalogKeys {
 
   /// `CbsRetryMessage` of the retry demonstration [id].
   static Key retryMessage(String id) => ValueKey('catalog-retry-message-$id');
+
+  /// Dynamic feedback demonstration (D03c-A.2 / C4).
+  static const Key dynamicFeedbackShow = ValueKey('catalog-feedback-show');
+  static const Key dynamicFeedbackHide = ValueKey('catalog-feedback-hide');
+  static const Key dynamicFeedbackMessage = ValueKey(
+    'catalog-feedback-message',
+  );
+
+  /// Loading indicator without `semanticLabel` (D03c-A.2 / D3).
+  static const Key unlabeledLoading = ValueKey('catalog-loading-unlabeled');
+
+  /// Dynamic progress demonstration (D03c-A.2 / D4).
+  static const Key progressIndicator = ValueKey('catalog-progress-indicator');
+  static const Key progressReadout = ValueKey('catalog-progress-readout');
+
+  /// Button setting the progress to [percent] %.
+  static Key progressOption(int percent) =>
+      ValueKey('catalog-progress-option-$percent');
 }

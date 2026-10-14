@@ -2,6 +2,7 @@ import 'package:cbs_flutter_ux/cbs_flutter_ux.dart';
 import 'package:flutter/material.dart';
 
 import '../catalog_demo.dart';
+import 'dynamic_feedback_demo.dart';
 
 /// Demonstration of [CbsFeedbackMessage].
 ///
@@ -10,6 +11,9 @@ import '../catalog_demo.dart';
 ///
 /// CURRENT (D03b-C.2): the four types, in `feedback-types`. Added in
 /// D03b-C.3: `feedback-expand`, `feedback-long` and `feedback-semantic`.
+/// Added in D03c-A.2 / C4: `feedback-dynamic`, a message displayed and
+/// hidden on user action, to observe (not correct) what a screen reader
+/// does when it appears.
 class FeedbackSection extends StatelessWidget {
   const FeedbackSection({super.key});
 
@@ -109,6 +113,12 @@ class FeedbackSection extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        catalogDemoGap,
+        CatalogDemo(
+          id: 'feedback-dynamic',
+          label: 'Dynamic feedback (shown and hidden on user action)',
+          child: CatalogDynamicFeedbackDemo(id: 'feedback-dynamic'),
         ),
       ],
     );

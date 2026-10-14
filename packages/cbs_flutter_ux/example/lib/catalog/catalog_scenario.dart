@@ -40,17 +40,38 @@ enum CatalogWidth {
   String get label => '${logicalPixels.round()} px';
 }
 
-/// Simulated text scale applied to the preview.
+/// Text scale applied to the preview.
+///
+/// `x1` and `x2` are simulated, absolute scales (CURRENT behaviour, kept
+/// unchanged). `device` applies no scale of its own: the preview uses the
+/// `TextScaler` that `MediaQuery` provides, i.e. the font size chosen in
+/// the device settings.
 enum CatalogTextScale {
   x1(label: 'x1', factor: 1),
-  x2(label: 'x2', factor: 2);
+  x2(label: 'x2', factor: 2),
+  device(label: 'Device');
 
-  const CatalogTextScale({required this.label, required this.factor});
+  const CatalogTextScale({required this.label, this.factor});
 
   final String label;
-  final double factor;
 
-  TextScaler get textScaler => TextScaler.linear(factor);
+  /// Absolute linear factor, or null when the scale follows the device.
+  final double? factor;
+
+  /// Whether the preview uses the `TextScaler` provided by `MediaQuery`.
+  bool get followsDevice => factor == null;
+
+  /// The simulated scales (`x1`, `x2`) that make up the 32-scenario matrix.
+  static const List<CatalogTextScale> simulated = [x1, x2];
+
+  /// The `TextScaler` the preview must apply.
+  ///
+  /// [deviceTextScaler] is the scaler provided by `MediaQuery`; it is
+  /// returned as is by `device`, never replaced by an absolute value.
+  TextScaler resolve(TextScaler deviceTextScaler) {
+    final fixed = factor;
+    return fixed == null ? deviceTextScaler : TextScaler.linear(fixed);
+  }
 }
 
 /// Local configuration of a catalog scenario.
@@ -109,12 +130,40 @@ final class CatalogScenario {
     );
   }
 
-  /// Every combination of design, appearance, width and text scale.
-  static Iterable<CatalogScenario> get all sync* {
+  /// Reference font size, in logical pixels, of [textScaleReadout].
+  static const double textScaleReferenceSize = 14;
+
+  /// Text showing how a [textScaleReferenceSize] font is rendered by the
+  /// device and by the preview, so that a change of the Android font size
+  /// can be observed without measuring pixels.
+  String textScaleReadout(TextScaler deviceTextScaler) {
+    String render(TextScaler scaler) =>
+        '${textScaleReferenceSize.round()} sp → '
+        '${scaler.scale(textScaleReferenceSize).toStringAsFixed(1)} sp';
+
+    return 'Device text size: ${render(deviceTextScaler)} · '
+        'Preview: ${render(textScale.resolve(deviceTextScaler))}';
+  }
+
+  /// The 32-scenario matrix: every combination of design, appearance,
+  /// width and simulated text scale (`x1`, `x2`).
+  ///
+  /// The `device` text scale is deliberately not part of this matrix: its
+  /// result depends on the device settings. See [allDeviceTextScale].
+  static Iterable<CatalogScenario> get all =>
+      _combinations(CatalogTextScale.simulated);
+
+  /// The 16 scenarios using the `device` text scale.
+  static Iterable<CatalogScenario> get allDeviceTextScale =>
+      _combinations(const [CatalogTextScale.device]);
+
+  static Iterable<CatalogScenario> _combinations(
+    List<CatalogTextScale> textScales,
+  ) sync* {
     for (final design in CatalogDesign.values) {
       for (final appearance in CatalogAppearance.values) {
         for (final width in CatalogWidth.values) {
-          for (final textScale in CatalogTextScale.values) {
+          for (final textScale in textScales) {
             yield CatalogScenario(
               design: design,
               appearance: appearance,

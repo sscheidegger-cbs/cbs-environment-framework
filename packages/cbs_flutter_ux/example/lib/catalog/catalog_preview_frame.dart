@@ -8,9 +8,12 @@ import 'catalog_scenario.dart';
 ///
 /// The child is laid out with a tight width equal to the scenario width
 /// and sees a matching `MediaQuery` (size and `TextScaler`), so widgets
-/// that read either one react as on a real device of that width. The
-/// simulated surface carries no padding: the width given to the child is
-/// exactly the width declared in its `MediaQuery`.
+/// that read either one react as on a real device of that width. With the
+/// `device` text scale, the `TextScaler` is the one provided by the
+/// enclosing `MediaQuery`, unchanged.
+///
+/// The simulated surface carries no padding: the width given to the child
+/// is exactly the width declared in its `MediaQuery`.
 ///
 /// The decorative frame (surface color, border and rounded corners) is
 /// drawn around the simulated surface and never inside it. The border is
@@ -51,7 +54,8 @@ class CatalogPreviewFrame extends StatelessWidget {
           child: MediaQuery(
             data: media.copyWith(
               size: Size(width, media.size.height),
-              textScaler: scenario.textScale.textScaler,
+              // `device` keeps the scaler provided by `MediaQuery`.
+              textScaler: scenario.textScale.resolve(media.textScaler),
             ),
             child: KeyedSubtree(key: CatalogKeys.previewContent, child: child),
           ),

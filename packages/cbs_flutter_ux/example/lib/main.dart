@@ -73,6 +73,14 @@ class _CbsUxShowcaseState extends State<CbsUxShowcase> {
                   key: CatalogKeys.scenarioSummary,
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
+                const SizedBox(height: CbsSpacing.xs),
+                // Page level: the real device text scaler, outside the
+                // simulated viewport.
+                Text(
+                  scenario.textScaleReadout(MediaQuery.textScalerOf(context)),
+                  key: CatalogKeys.textScaleReadout,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: CbsSpacing.md),
                 CatalogPreviewFrame(
                   scenario: scenario,

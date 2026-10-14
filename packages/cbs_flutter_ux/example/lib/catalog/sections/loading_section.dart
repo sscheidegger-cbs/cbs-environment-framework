@@ -2,6 +2,8 @@ import 'package:cbs_flutter_ux/cbs_flutter_ux.dart';
 import 'package:flutter/material.dart';
 
 import '../catalog_demo.dart';
+import '../catalog_keys.dart';
+import 'dynamic_progress_demo.dart';
 
 /// Demonstration of [CbsLoadingIndicator].
 ///
@@ -10,7 +12,9 @@ import '../catalog_demo.dart';
 ///
 /// CURRENT (D03b-C.2): indeterminate and determinate (60 %), in
 /// `loading-states`. Added in D03b-C.3: `loading-range`, the two bounds of
-/// the determinate range.
+/// the determinate range. Added in D03c-A.2: `loading-no-label` (D3, an
+/// indicator without `semanticLabel`) and `loading-progress` (D4, a
+/// determinate indicator whose progress changes on user action).
 class LoadingSection extends StatelessWidget {
   const LoadingSection({super.key});
 
@@ -84,6 +88,30 @@ class LoadingSection extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        catalogDemoGap,
+        // D03c-A.2 / D3: deliberately no `semanticLabel` and no replacement
+        // label (no wrapping `Semantics`): the demonstration exists to
+        // observe what a screen reader does without a label.
+        CatalogDemo(
+          id: 'loading-no-label',
+          label: 'Indeterminate without semanticLabel',
+          child: Column(
+            children: [
+              CbsLoadingIndicator(key: CatalogKeys.unlabeledLoading),
+              SizedBox(height: CbsSpacing.sm),
+              Text(
+                'No semanticLabel is provided to this indicator.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        catalogDemoGap,
+        CatalogDemo(
+          id: 'loading-progress',
+          label: 'Determinate with changing progress',
+          child: CatalogDynamicProgressDemo(),
         ),
       ],
     );
