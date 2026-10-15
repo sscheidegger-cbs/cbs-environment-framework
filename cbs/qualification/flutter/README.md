@@ -10,13 +10,16 @@ extraction of the common execution engine (D04b-C.2e step 1, `execution.sh`,
 section "Common execution engine" below; implemented and tested on Linux, native
 macOS qualification pending), and the operation `TEST` (D04b-C.2f, `test.sh`,
 section "TEST" below; implemented and tested on Linux with shims only, never run
-with a real Flutter toolchain, not qualified on macOS).** `contract.sh` is
-independent of any business application and runs nothing. `preflight.sh`
-(read-only), `analyze.sh` ("ANALYZE") and `test.sh` ("TEST") are the only
-executors; `execution.sh` is a library, not an executor.
-`BUILD_IOS` and `REPORT` are declared by the contract and are **not
-implemented**. The `TEST` tests use shims only: no real Flutter, Dart, Xcode or
-simulator has been run for `TEST`, and no native macOS run of `TEST` is claimed.
+with a real Flutter toolchain, not qualified on macOS), and the operation
+`BUILD_IOS` (D04b-C.2g, `build_ios.sh`, section "BUILD_IOS" below; implemented
+with shims only, never run with a real Flutter toolchain, never run on a Mac, not
+qualified on macOS).** `contract.sh` is independent of any business application
+and runs nothing. `preflight.sh` (read-only), `analyze.sh` ("ANALYZE"),
+`test.sh` ("TEST") and `build_ios.sh` ("BUILD_IOS") are the only executors;
+`execution.sh` is a library, not an executor.
+`REPORT` is declared by the contract and is **not implemented**. The `TEST` and
+`BUILD_IOS` tests use shims only: no real Flutter, Dart, Xcode or simulator has
+been run for them, and no native macOS run of `TEST` or `BUILD_IOS` is claimed.
 
 ## Components
 
@@ -32,8 +35,9 @@ simulator has been run for `TEST`, and no native macOS run of `TEST` is claimed.
   sources `preflight.sh`, which sources `contract.sh`.
 - `analyze.sh`: operation `ANALYZE` (below). It sources `execution.sh`.
 - `test.sh`: operation `TEST` (below). It sources `execution.sh`.
+- `build_ios.sh`: operation `BUILD_IOS` (below). It sources `execution.sh`.
 
-Not part of these steps: `BUILD_IOS`, `REPORT`, any CLI entry (`bin/cbs`
+Not part of these steps: `REPORT`, any CLI entry (`bin/cbs`
 is unchanged), any SSH transport (`cbs/remote/` is unchanged), any change to the
 worktree isolation (`cbs/worktree/` is unchanged).
 
@@ -459,10 +463,118 @@ creation, modes, no overwrite, redaction, bound) are those of ANALYZE.
   the existence check in the checkout; only symbolic links, absence and
   non-regular files are refused.
 
+## BUILD_IOS
+
+```bash
+bash cbs/qualification/flutter/build_ios.sh KEY=VALUE...
+```
+
+The arguments are the request of the contract (data only, same validation).
+`actions` must contain `build_ios` (otherwise `ACTION_NOT_ALLOWED`) after
+`preflight`. `build_ios.sh` sources `execution.sh` and does not duplicate it:
+validation, evidence location, PREFLIGHT gate, checkout check, supervision,
+timeout, redaction, log bound, classification, structured answer and evidence
+files are those of ANALYZE (above), with `BUILD_IOS` as the operation
+(`BUILD_IOS.log`, `BUILD_IOS.result`, facts `CBS_FLUTTER_QUAL_BUILD_IOS_*`, the
+command being named `flutter_build_ios`). The tool is looked up in the absolute
+entries of `PATH`, run from the isolated checkout (never the source repository),
+with `LC_ALL=C` and its standard input closed.
+
+### The command
+
+Exactly:
+
+```text
+flutter build ios --simulator --no-codesign
+```
+
+The four words after `flutter` are constants of `build_ios.sh`. The contract
+carries no parameter for this operation and it is not extended: the only target
+is `ios-simulator`, and the operation is "unsigned simulator build, no archive"
+(table "Operations and actions"). That is what fixes the command:
+
+| Word            | Why |
+|-----------------|-----|
+| `build ios`     | the iOS application bundle: neither an archive nor an IPA (`build ipa`, `--export-*` are never used) |
+| `--simulator`   | the only target of the contract |
+| `--no-codesign` | the contract says unsigned; given explicitly so that nothing is signed whatever the project says |
+
+No value of the request, of the checkout or of the environment is part of the
+command. No build mode (`--debug`, `--profile`, `--release`), flavor, target,
+version, define or option is added: the contract has no such parameter, and a
+request carrying one (`build_mode=...`, `codesign=...`, `dart_define=...`, a bare
+`--release`) is refused by the contract before anything runs (`123` or `125`).
+The mode is left to the default of `flutter` for a simulator build. No Xcode,
+`simctl` or CocoaPods command is run by this file, nothing is published or
+distributed, and `BUILD_IOS` never boots, creates, erases or deletes a simulator
+(a `simulator_udid` of the request is only observed by PREFLIGHT, read-only).
+
+### Guards of this operation
+
+Both are checked before anything is written:
+
+- **Environment.** Flutter turns the variables `FLUTTER_XCODE_<SETTING>` of its
+  environment into Xcode build settings (a development team, a signing identity,
+  ...): a signing configuration that the request never declared. When such a
+  variable is exported, the run is refused: `BLOCKED`, `ARGUMENT_REFUSED` (123),
+  before PREFLIGHT, nothing executed, nothing written. Nothing is unset or
+  rewritten, and neither the name nor the value is printed.
+- **Checkout.** The build writes in `build/`, `.dart_tool/` and `ios/` (and
+  `ios/Flutter/`) of the checkout. When one of them is a symbolic link the build
+  would write through it, possibly outside the isolation: `BLOCKED`,
+  `PATH_NOT_ALLOWED` (124), key `isolation_id`, after PREFLIGHT and before the
+  evidence is created. A missing directory is left to `flutter`, which reports it
+  (`FAIL`).
+
+### Results
+
+| Result    | Reason                  | RC  | When |
+|-----------|-------------------------|-----|------|
+| `PASS`    | -                       | 0   | `flutter` exited with `0` (tool status `0`) |
+| `FAIL`    | `COMMAND_FAILED`        | 130 | non-zero exit; the exact status is `OPERATION_TOOL_RC` |
+| `FAIL`    | `TIMEOUT`               | 131 | `timeout_seconds` elapsed |
+| `FAIL`    | `LOG_LIMIT_EXCEEDED`    | 133 | output over `log_max_bytes` |
+| `FAIL`    | `EVIDENCE_FAILURE`      | 134 | the evidence could not be written |
+| `BLOCKED` | request reasons         | 120..125 | request refused (`ACTION_NOT_ALLOWED` without `build_ios`; `ARGUMENT_REFUSED` also for a `FLUTTER_XCODE_*` variable; `PATH_NOT_ALLOWED` also: link in the checkout, evidence not usable or already present) |
+| `BLOCKED` | `ISOLATION_REJECTED`    | 126 | checkout path not a plain directory in the isolation root |
+| `BLOCKED` | `TOOL_UNAVAILABLE`      | 127 | `flutter` not found after PREFLIGHT |
+| `NOT_RUN` | `PREFLIGHT_NOT_PASSED`  | 136 | PREFLIGHT result is not `PASS` |
+
+`NETWORK_FAILURE` is never emitted. The exact exit status of `flutter` is never
+replaced by a contract code (`OPERATION_TOOL_RC`). Evidence rules (location,
+exclusive creation, modes `700` / `600`, no overwrite, redaction, bound) are
+those of ANALYZE:
+
+```text
+<evidence_root>/<qualification_id>/BUILD_IOS.log      redacted, bounded output
+<evidence_root>/<qualification_id>/BUILD_IOS.result   the structured answer
+```
+
+### What BUILD_IOS does not control
+
+- The same limits as ANALYZE (writes of `flutter` in the checkout and caches, a
+  process detached from the process group, tail of the output lost on `KILL`).
+- The build writes its output in the isolated checkout (`build/`, `ios/Flutter/`,
+  `ios/Pods/`, `pubspec.lock`, ...). Nothing is cleaned afterwards: the next
+  PREFLIGHT refuses a dirty tree, and a new isolation is needed to run again.
+  The build output is the product of the run; copying or exporting it is not
+  done here.
+- Signing can still be configured by what the commit holds (Xcode project,
+  `.xcconfig` files) or by the host (keychain): nothing of that is read or
+  checked. `--no-codesign` and `--simulator` are the options chosen by this file;
+  the guard on `FLUTTER_XCODE_*` rests on a behaviour of Flutter that is not
+  confirmed here either.
+- **Not confirmed on a real toolchain**: that `flutter build ios --simulator
+  --no-codesign` is accepted as is by Flutter 3.47.6 (the combination of the two
+  options, and the default build mode of a simulator build), that it produces the
+  expected bundle, and that CocoaPods or Xcode need nothing else (network, pods).
+  `BUILD_IOS` was only run against shims, on Linux. The first real run on the Mac
+  is the qualification of this operation.
+
 ## Rules imposed on the future executor
 
-These rules are part of the contract. ANALYZE and TEST apply them for their own
-operation; the other executors are not implemented.
+These rules are part of the contract. ANALYZE, TEST and BUILD_IOS apply them for
+their own operation; the other executors are not implemented.
 
 - Run only in the checkout created and verified by the CBS isolation manager,
   and revalidate it before every operation. Never run on the source repository.
@@ -487,7 +599,9 @@ contract, refused by `TEST`, see "TEST"); test selection strategy beyond
 `flutter analyze` and `flutter test`, and the form of the device option);
 simulator management; cache
 locations; final timeout and log bounds; durable evidence storage;
-`NETWORK_FAILURE` classification.
+`NETWORK_FAILURE` classification; build mode, options and output of `BUILD_IOS`
+beyond `--simulator --no-codesign` (no parameter exists in the contract, none was
+added; the command is to be confirmed on a real toolchain, see "BUILD_IOS").
 
 ## Tests
 
@@ -503,11 +617,22 @@ bash tests/test_flutter_qualification_analyze_portability.sh
 bash tests/test_flutter_qualification_test.sh
 bash tests/test_flutter_qualification_test_security.sh
 bash tests/test_flutter_qualification_test_portability.sh
+bash tests/test_flutter_qualification_build_ios.sh
 ```
+
+The `BUILD_IOS` test is deliberately small: the mechanisms of `execution.sh` are
+qualified by the ANALYZE and TEST suites and are not requalified. It covers the
+command (exact arguments, working directory, no other tool), the absence of any
+signature (no option, a `FLUTTER_XCODE_*` variable and parameters of the request
+refused), the isolation (the build lands in the checkout, never in the source or
+in another isolation, nothing is cleaned), the exact tool status, the gates
+(PREFLIGHT, links in the checkout, evidence never overwritten) and, as wiring
+only, the log bound and redaction.
 
 The contract tests are hermetic: forbidden-tool shims (`flutter`, `dart`,
 `xcrun`, `xcodebuild`, `simctl`, `git`, `ssh`, `scp`, `curl`, `wget`, `open`) are
-placed first in `PATH` and must remain uncalled. The PREFLIGHT, ANALYZE and TEST tests
+placed first in `PATH` and must remain uncalled. The PREFLIGHT, ANALYZE, TEST and
+BUILD_IOS tests
 use real Git repositories and real CBS isolations in a private directory, with
 shims for Flutter, Dart, Xcode and `simctl` as the only such tools on `PATH`;
 they run the suites sequentially (one at a time). They run on Linux and are meant to run
