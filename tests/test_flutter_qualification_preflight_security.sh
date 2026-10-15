@@ -692,14 +692,71 @@ unset PF_ENV_ASSIGN
 # A startup file named by the caller is not read by the bash processes of the
 # executor (the manager, the supervisor): only the first shell, which started
 # before the executor could do anything, can read it.
-printf 'echo "$0" >> "%s"\n' "$TMP/bash-env.log" > "$TMP/bash-env.sh"
+#
+# The first shell always reads it, so exactly one record means "the first shell
+# only". The value of "$0" at that moment is not portable: Bash 5 already holds
+# the script path, Bash 3.2 (macOS) was observed to hold the name of the
+# interpreter ("/bin/bash"; the startup file is read before $0 is set to the
+# script). It is therefore never
+# compared with a constant: the reference is MEASURED, with the same hook, on a
+# run that stops at the usage check, before any other bash can exist.
+printf 'echo "$$ $0" >> "%s"\n' "$TMP/bash-env.log" > "$TMP/bash-env.sh"
+
+# bash_env_records : number of records of the hook
+bash_env_records() {
+    wc -l < "$TMP/bash-env.log" | tr -d ' '
+}
+
+# bash_env_zero <line> : the "$0" of a record ("<pid> <$0>")
+bash_env_zero() {
+    printf '%s\n' "${1#* }"
+}
+
+# Reference: the first shell alone (no request: usage refusal, no child bash).
+: > "$TMP/bash-env.log"
+PF_ENV_ASSIGN="BASH_ENV=$TMP/bash-env.sh"
+pf_run BASH_ENV_REFERENCE
+unset PF_ENV_ASSIGN
+[[ "$(bash_env_records)" -eq 1 ]] || pf_fail "BASH_ENV_REFERENCE_RECORDS_$(bash_env_records)"
+BASH_ENV_FIRST_LINE="$(head -n 1 "$TMP/bash-env.log")"
+[[ "$BASH_ENV_FIRST_LINE" =~ ^[0-9]+\ .+$ ]] || pf_fail "BASH_ENV_REFERENCE_FORMAT_$BASH_ENV_FIRST_LINE"
+BASH_ENV_FIRST_ZERO="$(bash_env_zero "$BASH_ENV_FIRST_LINE")"
+
+# Full run: one single record, the one of the first shell (same "$0" as the
+# reference); any other record is a child bash that read the startup file.
 : > "$TMP/bash-env.log"
 PF_ENV_ASSIGN="BASH_ENV=$TMP/bash-env.sh"
 hostile_pass BASH_ENV_NOT_INHERITED
 unset PF_ENV_ASSIGN
-[[ "$(wc -l < "$TMP/bash-env.log" | tr -d ' ')" -eq 1 ]] || pf_fail "BASH_ENV_READ_BY_CHILDREN_$(tr '\n' ' ' < "$TMP/bash-env.log")"
-[[ "$(head -n 1 "$TMP/bash-env.log")" == "$PREFLIGHT" ]] || pf_fail "BASH_ENV_READER_$(head -n 1 "$TMP/bash-env.log")"
+[[ "$(bash_env_records)" -eq 1 ]] || pf_fail "BASH_ENV_READ_BY_CHILDREN_$(tr '\n' ' ' < "$TMP/bash-env.log")"
+BASH_ENV_LINE="$(head -n 1 "$TMP/bash-env.log")"
+[[ "$BASH_ENV_LINE" =~ ^[0-9]+\ .+$ ]] || pf_fail "BASH_ENV_FORMAT_$BASH_ENV_LINE"
+[[ "$(bash_env_zero "$BASH_ENV_LINE")" == "$BASH_ENV_FIRST_ZERO" ]] || pf_fail "BASH_ENV_READER_$BASH_ENV_LINE"
 
+# Sensitivity: the same hook, on a copy of the executor without its
+# "unset BASH_ENV", must be read by the child bash processes as well (at least
+# the first shell and one child), otherwise the check above proves nothing.
+BASH_ENV_MUT="$TMP/bash-env-mutant"
+mkdir -p "$BASH_ENV_MUT/stacks/flutter"
+cp -R "$ROOT/cbs" "$BASH_ENV_MUT/cbs"
+cp "$ROOT/stacks/flutter/stack.env" "$BASH_ENV_MUT/stacks/flutter/stack.env"
+BASH_ENV_MUT_SCRIPT="$BASH_ENV_MUT/cbs/qualification/flutter/preflight.sh"
+grep -v '^unset BASH_ENV$' "$BASH_ENV_MUT_SCRIPT" > "$BASH_ENV_MUT_SCRIPT.new"
+[[ "$(wc -l < "$BASH_ENV_MUT_SCRIPT" | tr -d ' ')" -eq $(( $(wc -l < "$BASH_ENV_MUT_SCRIPT.new" | tr -d ' ') + 1 )) ]] || pf_fail "BASH_ENV_MUTANT_NOT_SINGLE_LINE_REMOVAL"
+mv "$BASH_ENV_MUT_SCRIPT.new" "$BASH_ENV_MUT_SCRIPT"
+chmod +x "$BASH_ENV_MUT_SCRIPT"
+
+: > "$TMP/bash-env.log"
+pf_modes_reset
+pf_req_reset iso-git
+PF_PREFLIGHT_SCRIPT="$BASH_ENV_MUT_SCRIPT"
+PF_ENV_ASSIGN="BASH_ENV=$TMP/bash-env.sh"
+PF_NO_FINGERPRINT=1
+pf_run BASH_ENV_MUTANT "${PF_REQ[@]}"
+unset PF_NO_FINGERPRINT
+pf_modes_reset
+pf_req_reset iso-git
+[[ "$(bash_env_records)" -gt 1 ]] || pf_fail "BASH_ENV_CHECK_BLIND_TO_REGRESSION_RECORDS_$(bash_env_records)"
 unset PF_NO_FINGERPRINT
 
 # --- Git that cannot apply GIT_CONFIG_COUNT: refused before any repository is touched
