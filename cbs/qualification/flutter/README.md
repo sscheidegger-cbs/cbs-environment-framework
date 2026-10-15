@@ -3,7 +3,9 @@
 Generic contract for the local qualification of a Flutter application on an
 iOS simulator, inside a Git checkout isolated by CBS.
 
-**Status: contract, PREFLIGHT and ANALYZE (D04b-C.2b).** `contract.sh` is
+**Status: contract, PREFLIGHT and ANALYZE (D04b-C.2b), plus the preparation of
+local `path:` dependencies (D04b-C.2c, section "Local path dependencies"
+below; implemented and tested on Linux, not qualified on macOS).** `contract.sh` is
 independent of any business application and runs nothing. `preflight.sh`
 (read-only) and `analyze.sh` (this document, "ANALYZE") are the only executors.
 `TEST`, `BUILD_IOS` and `REPORT` are declared by the contract and are **not
@@ -381,4 +383,228 @@ shims for Flutter, Dart, Xcode and `simctl` as the only such tools on `PATH`;
 they run the suites sequentially (one at a time). They run on Linux and are meant to run
 on macOS with `/bin/bash` 3.2; the portability test reports separately whether a
 native Bash 3.2 was available (`NOT_RUN` otherwise). Qualification on a real Mac
-and with a real toolchain is a later step (D04b-C.2c) and is not claimed here.
+and with a real toolchain is not claimed by these suites: it is the macOS step of
+D04b-C.2c, documented below.
+
+# Local path dependencies (D04b-C.2c)
+
+```bash
+bash cbs/qualification/flutter/dependencies.sh prepare <consumer-id> <consumer-source> <isolation-root> \
+    <name> <source> <expected-origin> <commit> [<name> <source> <expected-origin> <commit>]...
+bash cbs/qualification/flutter/dependencies.sh verify  (same arguments, read-only)
+bash cbs/qualification/flutter/dependencies.sh cleanup <isolation-root> <name> <source> [<name> <source>]...
+```
+
+## The problem
+
+A Flutter consumer may declare a local dependency with a relative path:
+
+```yaml
+cbs_flutter_ux:
+  path: ../cbs-environment-framework/packages/cbs_flutter_ux
+```
+
+In a CBS isolation the checkout is `<isolation-root>/<consumer-id>`, so that path
+resolves to `<isolation-root>/cbs-environment-framework/packages/cbs_flutter_ux`:
+a sibling of the checkout, which does not exist. `flutter pub get`, and therefore
+`flutter analyze`, cannot resolve the dependency.
+
+History, kept as observed: a qualification of AMH-USR on macOS gave `PREFLIGHT=PASS`
+then `ANALYZE=FAIL` with `COMMAND_FAILED` and a tool status of 66, in the isolation
+`amh-usr-d04-analyze-01`. The cause established by the diagnosis is the path above.
+That failure stays documented; it is not rewritten by this step.
+
+## Design
+
+- **Same mechanism as the consumer.** The sibling repository is materialized by the
+  isolation manager of D04b-C.1 (unchanged): a detached worktree at an explicit
+  commit, created directly at `<isolation-root>/<name>`, with its CBS ownership
+  proof. `<name>` is the directory name that the relative path expects
+  (`cbs-environment-framework` above): it is a valid isolation identifier. No
+  symbolic link, no copy, no second mechanism. The relative path of the manifest is
+  preserved as is: nothing is rewritten.
+- **Nothing is guessed.** The consumer isolation is verified first (owned, exact
+  commit and origin, detached, clean). The tracked `pubspec.yaml` of that checkout
+  is read (data only: parsed, never evaluated) and its `path:` dependencies of
+  `dependencies`, `dev_dependencies` and `dependency_overrides` are classified:
+  inside the checkout (nothing to do, the directory must exist), under
+  `<isolation-root>/<name>/...` (the repository `<name>` is needed), anything else
+  (absolute path, path leaving the isolation root, unexpected character, form that
+  cannot be read safely) is refused. A `path:` that belongs to a `git:` source is not a
+  local path and is ignored.
+- **Explicit mapping.** Each needed `<name>` requires one `<name> <source> <expected-origin> <commit>`
+  group: the source repository, its origin and the full commit. A needed name without
+  mapping is refused (`DEPENDENCY_UNMAPPED`); a mapping that nothing needs is refused
+  (`MAPPING_UNUSED`): nothing unneeded is materialized. Before any creation, each
+  source must hold a regular `pubspec.yaml` at the declared package path of the
+  commit (`SOURCE_REJECTED` otherwise).
+- **Provenance and cleanliness.** After materialization (and for `verify`), the
+  manager verifies every resource again (proof, source, origin, exact commit,
+  detached `HEAD`, clean worktree). The declared packages must be canonical
+  directories (no symbolic link in any component) holding a plain `pubspec.yaml`,
+  and the `path:` dependencies of those packages must stay inside the consumer
+  checkout or inside a repository of this preparation (`PACKAGE_INVALID` otherwise;
+  only one level is checked).
+- **Idempotence.** Rerunning `prepare` with the same arguments gives `REUSED` for every
+  resource and changes nothing. A resource already present is accepted only when
+  the manager verifies it as CBS-owned, at the same commit and origin, detached and
+  clean. Anything else already there (a directory without CBS proof, a symbolic
+  link even dangling, another commit or origin, a modified worktree) is a conflict:
+  `BLOCKED`, left exactly as found, detected before the first creation. An
+  identifier already used by a previous (even cleaned) isolation of the root is a
+  conflict too, as the isolation contract forbids reusing an identifier. After a
+  partial failure (`MATERIALIZATION_FAILED`), the resources already created stay
+  (owned, clean) and a rerun reuses them.
+
+## Cleanup
+
+`cleanup` verifies every requested resource first, read-only (owned by CBS, exact,
+detached, clean): nothing is removed unless all of them pass (`CLEANUP_REFUSED`
+otherwise). It then calls the isolation manager `cleanup`, one resource at a time
+(non-forced `git worktree remove` of a worktree the manager created; the proof is
+kept and a `.cleaned` record is written). A failure stops everything: no retry, no
+sweep. A pre-existing directory, a symbolic link, an unknown identifier and a
+modified worktree are refused and never touched. Order: clean the consumer isolation
+first (`isolation_manager.sh cleanup`), then its dependencies. The identifier of a
+cleaned dependency cannot be prepared again in the same isolation root: use a new
+root for a new cycle.
+
+## Results
+
+Structured output (`CBS_FLUTTER_DEPS_*`, closed values only, no host path):
+`VERSION`, `OPERATION`, `CONSUMER_ID`, `CONSUMER_COMMIT`, `EXTERNAL_COUNT`,
+`INTERNAL_COUNT`, `DEPENDENCY_COUNT`, per resource `DEPENDENCY_<n>_NAME`, `_STATE`
+(`CREATED`, `REUSED`, `PRESENT`, `MISSING`, `CONFLICT`, `REMOVED`, `NOT_RUN`),
+`_COMMIT_EXPECTED`, `_COMMIT_OBSERVED`, `_PACKAGE`, then `REASON`, `DETAIL`, `RC` and,
+last, `RESULT` (`PASS`, `FAIL`, `BLOCKED`). The reason is repeated on stderr.
+
+| Reason                   | RC  | Result  | Meaning |
+|--------------------------|-----|---------|---------|
+| `USAGE`                  | 64  | BLOCKED | unknown command or wrong number of arguments |
+| `INPUT_INVALID`          | 140 | BLOCKED | an argument is invalid (value never echoed) |
+| `GIT_UNSUPPORTED`        | 141 | BLOCKED | Git older than 2.31 or ignoring `GIT_CONFIG_COUNT` |
+| `CONSUMER_REJECTED`      | 142 | BLOCKED | consumer isolation not owned, not exact, not clean |
+| `MANIFEST_UNSUPPORTED`   | 143 | BLOCKED | manifest not tracked or readable, form or path refused |
+| `DEPENDENCY_UNMAPPED`    | 144 | BLOCKED | a needed repository has no mapping |
+| `MAPPING_UNUSED`         | 145 | BLOCKED | a mapping is not needed by the manifest |
+| `DEPENDENCY_CONFLICT`    | 146 | BLOCKED | something else is at the path, or not as requested |
+| `DEPENDENCY_MISSING`     | 147 | BLOCKED | `verify`: a needed repository is not materialized |
+| `SOURCE_REJECTED`        | 148 | BLOCKED | the commit or the package is not in the source |
+| `CLEANUP_REFUSED`        | 149 | BLOCKED | a resource to clean is not owned, exact and clean |
+| `PACKAGE_INVALID`        | 150 | FAIL    | package, nested path or resource check failed |
+| `MATERIALIZATION_FAILED` | 151 | FAIL    | the isolation manager failed to create a resource |
+| `CLEANUP_FAILED`         | 152 | FAIL    | the isolation manager failed to remove a resource |
+
+`DETAIL` is a closed identifier (often the reason of the isolation manager, for
+example `WORKTREE_DIRTY`). Codes 140..152 collide with no code of another CBS
+component.
+
+## Not covered, on purpose
+
+- Only the root `pubspec.yaml` of the consumer is read (not nested manifests, not a
+  Dart workspace); `flow-style` dependency sections and tab indentation are refused,
+  not interpreted. Packages are checked one level deep.
+- `prepare` does not run Flutter, Dart or `pub`, and does not touch the network. It is
+  a separate step: PREFLIGHT and ANALYZE (unchanged) neither call it nor check that
+  it ran. Run it between the creation of the isolation and PREFLIGHT.
+- The isolation manager adds (and, at cleanup, removes) the Git administrative entry of
+  each worktree in the source repository, as for the consumer isolation. Working
+  tree, branches and untracked files of the sources are not touched (tested).
+- `flutter analyze` may modify the consumer checkout (`pubspec.lock`, `.dart_tool/`)
+  and refuses a dirty tree at the next PREFLIGHT (see "What ANALYZE does not
+  control"). A dirty consumer checkout or dependency is refused by `cleanup`: the
+  operator decides, nothing is forced.
+- No real Flutter, Dart or Xcode has been run by these tests.
+
+## Tests (Linux, hermetic)
+
+```bash
+bash tests/test_flutter_qualification_dependencies.sh
+bash tests/test_flutter_qualification_dependencies_portability.sh
+```
+
+The first one uses temporary Git repositories and the real isolation manager in
+temporary roots, no network, no user Git configuration, no Flutter. It covers usage,
+refusals before any change, `prepare`, idempotence, `verify`, conflicts (commit,
+origin, dirty worktree, directory without proof, symbolic link, dangling link,
+burnt identifier), cleanup (all-or-nothing, preserved pre-existing data), several
+repositories and partial failure, refused manifests, nested paths, the consumer
+gate, arguments as data (secret, injection, traversal), and the structure of the
+script (no link, no deletion, no network, no `eval`, one `source`). The second one
+scans for Bash 4 and GNU-only constructs, runs the manifest reader under every
+available `awk`, and runs the first one with a genuine Bash 3.2 when one exists
+(`NOT_RUN` otherwise; `NATIVE_MACOS` is `PASS` only on Darwin).
+
+## Qualification on macOS (to be run; not yet run)
+
+Status vocabulary: IMPLEMENTED (code present), TESTED_LINUX (hermetic suites above),
+TESTED_MACOS (the two suites above, run natively on a Mac) and QUALIFIED (real
+PREFLIGHT and ANALYZE on the Mac, with the real toolchain, after preparation).
+D04b-C.2c is QUALIFIED only when the sequence below was really executed and observed.
+
+Commands (run on the Mac, from a checkout of this repository that contains
+D04b-C.2c; the paths and the evidence root are the operator's choice and must exist):
+
+```bash
+# 0. Variables. Every path must be adapted to the Mac; none is assumed to exist.
+CBS_FW="$HOME/projects/cbs-environment-framework"      # checkout holding D04b-C.2c
+AMH_SRC="$HOME/projects/amh-usr"                        # source consumer, never modified
+ISO_ROOT="$HOME/.cbs/isolations/amh-usr-d04"            # authorized isolation root
+EVID_ROOT="${EVID_ROOT:?set the existing evidence root (mode 700)}"
+CONSUMER_ID="amh-usr-d04-analyze-02"                    # a new identifier: never reuse one
+QUAL_ID="amh-usr-d04-c2c-01"
+AMH_COMMIT="bc0ad39d8be6b42a0109b7de18a6104b038f3f92"
+FW_COMMIT="177ba996e02b7c58ba1c54aed9f965ba71db8ff2"    # holds packages/cbs_flutter_ux
+AMH_ORIGIN="$(git -C "$AMH_SRC" remote get-url origin)"
+FW_ORIGIN="$(git -C "$CBS_FW" remote get-url origin)"
+printf '%s\n%s\n' "$AMH_ORIGIN" "$FW_ORIGIN"            # review before going on
+cd "$CBS_FW" && git status --short --branch && git rev-parse HEAD
+
+# 1. Native tests of this step (Bash 3.2, BSD tools).
+/bin/bash --version | head -n 1
+/bin/bash tests/test_flutter_qualification_dependencies.sh
+/bin/bash tests/test_flutter_qualification_dependencies_portability.sh   # expects NATIVE_MACOS=PASS
+bash tests/run_portable_non_regression.sh
+
+# 2. New isolation of the consumer (D04b-C.1, unchanged).
+bash cbs/worktree/isolation_manager.sh create "$CONSUMER_ID" "$AMH_SRC" "$AMH_ORIGIN" "$AMH_COMMIT" "$ISO_ROOT"
+
+# 3. Preparation, then read-only verification.
+bash cbs/qualification/flutter/dependencies.sh prepare "$CONSUMER_ID" "$AMH_SRC" "$ISO_ROOT" \
+    cbs-environment-framework "$CBS_FW" "$FW_ORIGIN" "$FW_COMMIT"
+bash cbs/qualification/flutter/dependencies.sh verify "$CONSUMER_ID" "$AMH_SRC" "$ISO_ROOT" \
+    cbs-environment-framework "$CBS_FW" "$FW_ORIGIN" "$FW_COMMIT"
+
+# 4. PREFLIGHT then ANALYZE (unchanged executors). The timeout and the log bound
+#    are examples inside the contract bounds; choose them. Add the optional keys of
+#    the contract (simulator_udid=..., simulator_policy=existing_only) when the
+#    qualification targets a given existing simulator.
+REQ=(contract_version=1 "qualification_id=$QUAL_ID" "isolation_id=$CONSUMER_ID"
+     "source_repository=$AMH_SRC" "expected_origin=$AMH_ORIGIN" "commit=$AMH_COMMIT"
+     "isolation_root=$ISO_ROOT" "evidence_root=$EVID_ROOT" target=ios-simulator
+     timeout_seconds=900 log_max_bytes=1048576 evidence_retention=keep cleanup_policy=none)
+bash cbs/qualification/flutter/preflight.sh "${REQ[@]}" actions=preflight
+bash cbs/qualification/flutter/analyze.sh "${REQ[@]}" actions=preflight,analyze
+```
+
+Expected observations: step 3 `RESULT=PASS` (`CREATED`, then `PRESENT`), PREFLIGHT
+`RESULT=PASS`, ANALYZE `RESULT=PASS` with a log in the evidence directory. Any other
+value is reported as observed, never as a PASS. The historical `COMMAND_FAILED` with
+tool status 66 is the failure this step is meant to remove: it is considered removed
+only if ANALYZE passes after the preparation.
+
+## Cleanup commands (Mac)
+
+Only what these steps created, in this order. Nothing is forced; a refusal is
+reported and stops the sequence. The evidence directory is kept.
+
+```bash
+bash cbs/worktree/isolation_manager.sh cleanup "$CONSUMER_ID" "$AMH_SRC" "$ISO_ROOT"
+bash cbs/qualification/flutter/dependencies.sh cleanup "$ISO_ROOT" cbs-environment-framework "$CBS_FW"
+```
+
+If `flutter analyze` left the consumer checkout modified (for example `pubspec.lock`),
+the first command is refused (dirty worktree): inspect it, and decide explicitly what
+to do with the isolation; do not use `git reset` or `git clean` on it from this
+procedure. The previous isolation `amh-usr-d04-analyze-01` is not touched by any of
+these commands.

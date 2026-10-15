@@ -827,3 +827,47 @@ Flutter stack action, iOS build, and long-running remote actions.
 
 The portable runner `tests/run_portable_non_regression.sh` picks the new tests
 up automatically through its `tests/test_*.sh` glob.
+
+## D04b-C.2c Flutter local dependencies test suite
+
+Executable tests (not part of the historical real-state exclusions; picked up by
+`tests/run_portable_non_regression.sh` through its `tests/test_*.sh` glob):
+
+```text
+tests/test_flutter_qualification_dependencies.sh
+tests/test_flutter_qualification_dependencies_portability.sh
+```
+
+### Hermeticity
+
+The behaviour test builds temporary Git repositories (consumer, framework, other
+repositories) and runs the real CBS isolation manager (D04b-C.1) in temporary
+isolation roots, with a hermetic Git configuration (no user, system or inherited
+configuration). No Flutter, Dart, Xcode, network, SSH, or real consumer is used,
+and nothing under the real workspace or `~/.cbs` is read or written. The
+temporary directories are removed on exit.
+
+### What it validates
+
+Usage, refusals before any change, `prepare` (provenance, exact commit, detached and
+clean worktree, relative path resolving to the materialized package, no symbolic
+link, consumer and source repositories preserved), idempotence (`REUSED`, root
+unchanged), read-only `verify`, conflicts (commit, origin, modified worktree,
+directory without CBS proof, symbolic and dangling link, burnt identifier),
+cleanup (all-or-nothing, only manager-owned resources, pre-existing data
+preserved), several repositories and partial failure with rerun, refused manifests
+(outside the root, absolute path, flow-style, empty path, unexpected character,
+missing internal path), no external dependency, nested paths, the consumer gate
+(unknown, dirty, edited manifest), arguments as data (secret, injection,
+traversal, symbolic root), closed output language, and the structure of the script.
+
+The portability test scans for Bash 4 and GNU-only constructs, runs the manifest
+reader under every available `awk` (`awk`, `mawk`, `gawk`, `nawk`, and `gawk --posix`),
+and runs the behaviour test with a genuine Bash 3.2 when one exists (`NOT_RUN`
+otherwise; its `NATIVE_MACOS` marker is `PASS` only on Darwin).
+
+### D04b-C.2c qualification boundary
+
+Tested on Linux only. Not qualified by these suites: a native macOS run (to be run:
+see `cbs/qualification/flutter/README.md`), a real Flutter `pub get`/`analyze`, the
+real AMH-USR consumer, and the real WSL-to-Mac isolation.
