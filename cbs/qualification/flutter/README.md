@@ -535,7 +535,7 @@ scans for Bash 4 and GNU-only constructs, runs the manifest reader under every
 available `awk`, and runs the first one with a genuine Bash 3.2 when one exists
 (`NOT_RUN` otherwise; `NATIVE_MACOS` is `PASS` only on Darwin).
 
-## Qualification on macOS (to be run; not yet run)
+## Qualification on macOS (D04b-C.2c: QUALIFIED)
 
 Status vocabulary: IMPLEMENTED (code present), TESTED_LINUX (hermetic suites above),
 TESTED_MACOS (the two suites above, run natively on a Mac) and QUALIFIED (real
@@ -559,6 +559,14 @@ AMH_ORIGIN="$(git -C "$AMH_SRC" remote get-url origin)"
 FW_ORIGIN="$(git -C "$CBS_FW" remote get-url origin)"
 printf '%s\n%s\n' "$AMH_ORIGIN" "$FW_ORIGIN"            # review before going on
 cd "$CBS_FW" && git status --short --branch && git rev-parse HEAD
+
+# Toolchain for non-interactive SSH sessions.
+# The standard SSH PATH may not contain the CBS Flutter installation.
+# Adapt the path to the actual Mac installation; do not install or modify
+# the host configuration merely to satisfy this qualification.
+export PATH="$HOME/.cbs/toolchains/flutter/3.47.6/bin:$PATH"
+command -v flutter
+command -v dart
 
 # 1. Native tests of this step (Bash 3.2, BSD tools).
 /bin/bash --version | head -n 1
@@ -592,6 +600,29 @@ Expected observations: step 3 `RESULT=PASS` (`CREATED`, then `PRESENT`), PREFLIG
 value is reported as observed, never as a PASS. The historical `COMMAND_FAILED` with
 tool status 66 is the failure this step is meant to remove: it is considered removed
 only if ANALYZE passes after the preparation.
+
+### Observed macOS qualification — D04b-C.2c
+
+Executed on 2026-10-15 with Flutter 3.47.6 and Dart 3.13.5.
+
+- Framework qualification implementation: `966ed2cf6b26752996a62de3a68f81d8457cd510`.
+- AMH-USR consumer commit: `bc0ad39d8be6b42a0109b7de18a6104b038f3f92`.
+- Framework dependency commit: `177ba996e02b7c58ba1c54aed9f965ba71db8ff2`.
+- Dependency preparation: `PASS` (`CREATED`).
+- Dependency verification: `PASS` (`PRESENT`).
+- PREFLIGHT: `PASS`, return code `0`.
+- ANALYZE: `PASS`, tool return code `0`; no issues found.
+- Qualification identifier: `amh-usr-d04-c2c-01`.
+- Evidence on the qualification Mac:
+  `$HOME/.cbs/evidence/amh-usr-d04-c2c-01/amh-usr-d04-c2c-01/`.
+- Evidence files: `ANALYZE.result` and `ANALYZE.log`.
+- Evidence retention: `keep`; cleanup not authorized.
+
+The historical Flutter command failure with tool return code `66`
+was not reproduced after dependency preparation.
+
+This result qualifies PREFLIGHT and ANALYZE for the specified commits
+and environment. It does not qualify other Flutter operations.
 
 ## Cleanup commands (Mac)
 
