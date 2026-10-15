@@ -5,9 +5,13 @@ iOS simulator, inside a Git checkout isolated by CBS.
 
 **Status: contract, PREFLIGHT and ANALYZE (D04b-C.2b), plus the preparation of
 local `path:` dependencies (D04b-C.2c, section "Local path dependencies"
-below; implemented and tested on Linux, not qualified on macOS).** `contract.sh` is
+below; implemented and tested on Linux, not qualified on macOS), and the
+extraction of the common execution engine (D04b-C.2e step 1, `execution.sh`,
+section "Common execution engine" below; implemented and tested on Linux, native
+macOS qualification pending).** `contract.sh` is
 independent of any business application and runs nothing. `preflight.sh`
-(read-only) and `analyze.sh` (this document, "ANALYZE") are the only executors.
+(read-only) and `analyze.sh` (this document, "ANALYZE") are the only executors;
+`execution.sh` is a library, not an executor.
 `TEST`, `BUILD_IOS` and `REPORT` are declared by the contract and are **not
 implemented**. Everything is tested with shims only: no real Flutter, Dart,
 Xcode or simulator has been run, and no native macOS run is claimed.
@@ -21,8 +25,10 @@ Xcode or simulator has been run, and no native macOS run is claimed.
 
 - `preflight.sh`: read-only observation of the checkout, the toolchain and the
   simulator (operation `PREFLIGHT`). Unchanged by ANALYZE.
-- `analyze.sh`: operation `ANALYZE` (below). It sources `preflight.sh`, which
-  sources `contract.sh`.
+- `execution.sh`: the technical mechanisms common to the mutating operations
+  (below, "Common execution engine"). Sourced, defines functions only. It
+  sources `preflight.sh`, which sources `contract.sh`.
+- `analyze.sh`: operation `ANALYZE` (below). It sources `execution.sh`.
 
 Not part of this step: `TEST`, `BUILD_IOS`, `REPORT`, any CLI entry (`bin/cbs`
 is unchanged), any SSH transport (`cbs/remote/` is unchanged), any change to the
@@ -258,8 +264,8 @@ Sequence, each step stopping the operation:
 Exactly `flutter analyze`: the single argument is the constant
 `CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT`. No value of the request, of the checkout or
 of the environment is part of the command; there is no `eval`, no `source` of
-anything but the two fixed files, no option (`--no-pub` and the like are an open
-decision). The tool is run from the isolated checkout, never from the source
+anything but the fixed files of this directory, no option (`--no-pub` and the
+like are an open decision). The tool is run from the isolated checkout, never from the source
 repository, with `LC_ALL=C` and its standard input closed.
 
 ### Bounds
@@ -320,6 +326,24 @@ as existing), the run is refused (`PATH_NOT_ALLOWED`): nothing is overwritten,
 followed or deleted. The only file removed is the temporary capture
 `ANALYZE.log.partial` of the same run. Evidence is never written in the
 checkout or the source repository.
+
+### Common execution engine
+
+`execution.sh` (D04b-C.2e step 1) holds what does not depend on the operation,
+moved out of `analyze.sh` without any change of behaviour: the request step,
+the evidence location and its exclusive creation, the PREFLIGHT gate, the check
+of the checkout path, the bounded execution (fixed supervisor and runner, process
+groups, timeout, redaction, log bound), the classification of the outcome and
+the structured answer. The file names and the fact names derive from the
+operation (`<OPERATION>.log`, `CBS_FLUTTER_QUAL_<OPERATION>_*`).
+
+The engine defines no command: the operation file looks the tool up and passes
+the complete command line, constant text of that file. `analyze.sh` keeps the
+selected action, the argument `analyze`, the lookup of `flutter` and the order
+of the steps. The interface of ANALYZE (arguments, structured output, return
+codes, evidence files) is unchanged. `TEST` and `BUILD_IOS` are not implemented
+by this step; the supervisor and runner markers (`CBS_ANALYZE_*`) keep their
+historical names for now.
 
 ### What ANALYZE does not control
 

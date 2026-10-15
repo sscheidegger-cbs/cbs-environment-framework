@@ -15,6 +15,7 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANALYZE="$ROOT/cbs/qualification/flutter/analyze.sh"
+EXECUTION="$ROOT/cbs/qualification/flutter/execution.sh"
 CONTRACT="$ROOT/cbs/qualification/flutter/contract.sh"
 TEST_PREFIX="TEST_FLUTTER_QUALIFICATION_ANALYZE_SECURITY"
 
@@ -25,6 +26,8 @@ source "$CONTRACT"
 
 [[ -f "$ANALYZE" ]] || pf_fail "ANALYZE_MISSING"
 bash -n "$ANALYZE" || pf_fail "ANALYZE_SYNTAX"
+[[ -f "$EXECUTION" ]] || pf_fail "EXECUTION_MISSING"
+bash -n "$EXECUTION" || pf_fail "EXECUTION_SYNTAX"
 
 iso_fixture_init
 pf_init
@@ -296,7 +299,7 @@ an_modes_reset
 cat > "$TMP/evil-contract.sh" <<EOF
 touch "$PWNED"
 EOF
-AN_ENV_ASSIGN="CBS_FLUTTER_QUAL_ANALYZE_CONTRACT=$TMP/evil-contract.sh CBS_FLUTTER_QUAL_ANALYZE_DIR=$TMP CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT=--no-pub CBS_FLUTTER_QUAL_ANALYZE_SUPERVISOR=true CBS_FLUTTER_QUAL_ANALYZE_RUNNER=true AN_RESULT=PASS AN_PARTIAL=$TMP/evil-partial AN_QDIR=$TMP AN_EVIDENCE=WRITTEN"
+AN_ENV_ASSIGN="CBS_FLUTTER_QUAL_ANALYZE_CONTRACT=$TMP/evil-contract.sh CBS_FLUTTER_QUAL_ANALYZE_DIR=$TMP CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT=--no-pub CBS_FLUTTER_QUAL_ANALYZE_SUPERVISOR=true CBS_FLUTTER_QUAL_ANALYZE_RUNNER=true AN_RESULT=PASS AN_PARTIAL=$TMP/evil-partial AN_QDIR=$TMP AN_EVIDENCE=WRITTEN CBS_FLUTTER_QUAL_EXEC_CONTRACT=$TMP/evil-contract.sh CBS_FLUTTER_QUAL_EXEC_DIR=$TMP CBS_FLUTTER_QUAL_EXEC_SUPERVISOR=true CBS_FLUTTER_QUAL_EXEC_RUNNER=true EX_OPERATION=TEST EX_COMMAND_NAME=evil EX_RESULT=PASS EX_REASON= EX_PARTIAL=$TMP/evil-partial EX_QDIR=$TMP EX_LOG=$TMP/evil-log EX_RESULT_FILE=$TMP/evil-result EX_EVIDENCE=WRITTEN EX_STARTED=1 EX_CHECKOUT=$TMP EX_EVIDENCE_ROOT=$TMP EX_ISOLATION_ROOT=$TMP EX_TIMEOUT=1 EX_CAP=1"
 an_req iso-sec qual-sec-env-state
 an_run ENV_STATE "${PF_REQ[@]}"
 an_expect ENV_STATE PASS - 0 0
@@ -427,24 +430,35 @@ pf_pass "TOOL_TEXT_IS_DATA"
 # ---------------------------------------------------------------- 8. static scan of the executor
 
 [[ -f "$ANALYZE" ]] || pf_fail "STATIC_MISSING"
+[[ -f "$EXECUTION" ]] || pf_fail "STATIC_EXECUTION_MISSING"
 
+# The executor is made of two files: the operation (analyze.sh) and the common
+# execution engine it sources (execution.sh, D04b-C.2e). Every rule below that
+# was written for the single former file applies to the two of them together
+# (ALL), so that moving code from one to the other never removes a check.
+#
 # The executor is read in three parts: the runner and the supervisor (fixed
-# texts run by a fresh bash, with their own rules) and everything else (the
-# strict rules).
-OUTSIDE="$TMP/analyze-outside.sh"
+# texts run by a fresh bash, with their own rules, held by the engine) and
+# everything else (the strict rules).
+ALL="$TMP/executor-all.sh"
+OUTSIDE_ENGINE="$TMP/execution-outside.sh"
+OUTSIDE="$TMP/executor-outside.sh"
 SUPERVISOR="$TMP/analyze-supervisor.sh"
 RUNNER="$TMP/analyze-runner.sh"
-sed -e "/^CBS_FLUTTER_QUAL_ANALYZE_SUPERVISOR='\$/,/^'\$/d" -e "/^CBS_FLUTTER_QUAL_ANALYZE_RUNNER='\$/,/^'\$/d" "$ANALYZE" > "$OUTSIDE"
-sed -n -e "/^CBS_FLUTTER_QUAL_ANALYZE_SUPERVISOR='\$/,/^'\$/p" "$ANALYZE" | sed -e '1d' -e '$d' > "$SUPERVISOR"
-sed -n -e "/^CBS_FLUTTER_QUAL_ANALYZE_RUNNER='\$/,/^'\$/p" "$ANALYZE" | sed -e '1d' -e '$d' > "$RUNNER"
+cat "$ANALYZE" "$EXECUTION" > "$ALL"
+sed -e "/^CBS_FLUTTER_QUAL_EXEC_SUPERVISOR='\$/,/^'\$/d" -e "/^CBS_FLUTTER_QUAL_EXEC_RUNNER='\$/,/^'\$/d" "$EXECUTION" > "$OUTSIDE_ENGINE"
+cat "$ANALYZE" "$OUTSIDE_ENGINE" > "$OUTSIDE"
+sed -n -e "/^CBS_FLUTTER_QUAL_EXEC_SUPERVISOR='\$/,/^'\$/p" "$EXECUTION" | sed -e '1d' -e '$d' > "$SUPERVISOR"
+sed -n -e "/^CBS_FLUTTER_QUAL_EXEC_RUNNER='\$/,/^'\$/p" "$EXECUTION" | sed -e '1d' -e '$d' > "$RUNNER"
 [[ -s "$SUPERVISOR" && -s "$RUNNER" ]] || pf_fail "STATIC_TEXTS_NOT_FOUND"
-[[ "$(grep -c "CBS_FLUTTER_QUAL_ANALYZE_SUPERVISOR='" "$ANALYZE")" -eq 1 ]] || pf_fail "STATIC_SUPERVISOR_DEFINED_ONCE"
-[[ "$(grep -c "CBS_FLUTTER_QUAL_ANALYZE_RUNNER='" "$ANALYZE")" -eq 1 ]] || pf_fail "STATIC_RUNNER_DEFINED_ONCE"
+[[ "$(grep -c "CBS_FLUTTER_QUAL_EXEC_SUPERVISOR='" "$ALL")" -eq 1 ]] || pf_fail "STATIC_SUPERVISOR_DEFINED_ONCE"
+[[ "$(grep -c "CBS_FLUTTER_QUAL_EXEC_RUNNER='" "$ALL")" -eq 1 ]] || pf_fail "STATIC_RUNNER_DEFINED_ONCE"
 ! grep -q -e "SUPERVISOR='" -e "RUNNER='" "$OUTSIDE" || pf_fail "STATIC_TEXTS_SPLIT"
+! grep -q -e "SUPERVISOR='" -e "RUNNER='" "$ANALYZE" || pf_fail "STATIC_TEXTS_IN_OPERATION_FILE"
 bash -n "$SUPERVISOR" || pf_fail "STATIC_SUPERVISOR_SYNTAX"
 bash -n "$RUNNER" || pf_fail "STATIC_RUNNER_SYNTAX"
 
-if pf_code_matches "$ANALYZE" '(^|[;&|({[:space:]])eval([[:space:]]|$)'; then
+if pf_code_matches "$ALL" '(^|[;&|({[:space:]])eval([[:space:]]|$)'; then
     pf_fail "STATIC_EVAL"
 fi
 
@@ -456,10 +470,14 @@ fi
 RUNNER_SOURCES="$(grep -En '(^|[;&|({[:space:]])(source|\.)[[:space:]]' "$RUNNER" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://')"
 [[ "$RUNNER_SOURCES" == '. "$contract" || exit 252' ]] || pf_fail "STATIC_RUNNER_SOURCES_$RUNNER_SOURCES"
 
-# Outside the texts: one sourced file, PREFLIGHT, at a path derived from this file.
-SOURCED="$(grep -En '^[[:space:]]*(source|\.)[[:space:]]' "$OUTSIDE" |
+# Outside the texts, one sourced file per file, at a path derived from the file
+# itself: the operation sources the engine, the engine sources PREFLIGHT.
+SOURCED="$(grep -En '^[[:space:]]*(source|\.)[[:space:]]' "$ANALYZE" |
     grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
-[[ "$SOURCED" == 'source "$CBS_FLUTTER_QUAL_ANALYZE_DIR/preflight.sh"' ]] || pf_fail "STATIC_SOURCED_FILES"
+[[ "$SOURCED" == 'source "$CBS_FLUTTER_QUAL_ANALYZE_DIR/execution.sh"' ]] || pf_fail "STATIC_SOURCED_FILES_OPERATION"
+SOURCED="$(grep -En '^[[:space:]]*(source|\.)[[:space:]]' "$OUTSIDE_ENGINE" |
+    grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
+[[ "$SOURCED" == 'source "$CBS_FLUTTER_QUAL_EXEC_DIR/preflight.sh"' ]] || pf_fail "STATIC_SOURCED_FILES_ENGINE"
 
 # No command that moves, copies, links, changes a mode or an owner, truncates,
 # makes a temporary file, uses the network, a privilege or an interpreter. The
@@ -473,16 +491,16 @@ done
 
 # Removal: exactly one "rm", of the capture of this run, forced only so that an
 # already absent capture is not an error; never recursive.
-RMS="$(grep -En '(^|[;&|({[:space:]])rm[[:space:]]' "$ANALYZE" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
-[[ "$RMS" == 'rm -f -- "$AN_PARTIAL" 2>/dev/null || return 1' ]] || pf_fail "STATIC_RM_LIST_$RMS"
+RMS="$(grep -En '(^|[;&|({[:space:]])rm[[:space:]]' "$ALL" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
+[[ "$RMS" == 'rm -f -- "$EX_PARTIAL" 2>/dev/null || return 1' ]] || pf_fail "STATIC_RM_LIST_$RMS"
 
 # Directory creation: exactly one "mkdir", without "-p": the evidence root is the
 # parent and must exist.
-MKDIRS="$(grep -En '(^|[;&|({[:space:]])mkdir[[:space:]]' "$ANALYZE" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
-[[ "$MKDIRS" == '( umask 077; mkdir "$AN_QDIR" ) 2>/dev/null || return 1' ]] || pf_fail "STATIC_MKDIR_LIST_$MKDIRS"
+MKDIRS="$(grep -En '(^|[;&|({[:space:]])mkdir[[:space:]]' "$ALL" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
+[[ "$MKDIRS" == '( umask 077; mkdir "$EX_QDIR" ) 2>/dev/null || return 1' ]] || pf_fail "STATIC_MKDIR_LIST_$MKDIRS"
 
 # "find" only reads the mode of a directory.
-FINDS="$(grep -En '(^|[;&|({[:space:]])find[[:space:]]' "$ANALYZE" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
+FINDS="$(grep -En '(^|[;&|({[:space:]])find[[:space:]]' "$ALL" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
 [[ "$FINDS" == 'found="$(find "$path" -maxdepth 0 \( -perm -020 -o -perm -002 \) 2>/dev/null)" || return 1' ]] || pf_fail "STATIC_FIND_LIST_$FINDS"
 
 # Every file written is created exclusively (noclobber) under a private umask,
@@ -494,9 +512,9 @@ WRITES="$(awk '
         gsub(/[0-9]*>\/dev\/null|[0-9]*>&[0-9]|>&2|<\/dev\/null|\$\(\(/, "", probe)
         if (probe ~ /(^|[^<>])>[^&>=]|>>|>$/) { sub(/^[[:space:]]+/, ""); print }
     }' "$OUTSIDE" || true)"
-EXPECTED_WRITES='( umask 077; set -C; : > "$AN_PARTIAL" ) 2>/dev/null || return 1
-( umask 077; set -C; head -c "$cap" "$AN_PARTIAL" > "$AN_LOG" ) 2>/dev/null || return 1
-( umask 077; set -C; printf '"'"'%s\n'"'"' "$AN_BODY" > "$AN_RESULT_FILE" ) 2>/dev/null || return 1'
+EXPECTED_WRITES='( umask 077; set -C; : > "$EX_PARTIAL" ) 2>/dev/null || return 1
+( umask 077; set -C; head -c "$cap" "$EX_PARTIAL" > "$EX_LOG" ) 2>/dev/null || return 1
+( umask 077; set -C; printf '"'"'%s\n'"'"' "$EX_BODY" > "$EX_RESULT_FILE" ) 2>/dev/null || return 1'
 if [[ "$WRITES" != "$EXPECTED_WRITES" ]]; then
     printf '%s\n' "$WRITES" > "$TMP/static-writes.txt"
     pf_fail "STATIC_WRITE_LIST"
@@ -504,32 +522,36 @@ fi
 
 # Git is never run by this file (it is reached through PREFLIGHT and the
 # isolation manager only), and no mutation, clean or reset is spelled anywhere.
-if pf_code_matches "$ANALYZE" '(^|[;&|({]|\$\()[[:space:]]*git[[:space:]]'; then
+if pf_code_matches "$ALL" '(^|[;&|({]|\$\()[[:space:]]*git[[:space:]]'; then
     pf_fail "STATIC_GIT_COMMAND"
 fi
-if pf_code_matches "$ANALYZE" 'git[[:space:]]+(clean|reset|checkout|switch|restore|add|commit|fetch|pull|push|clone|worktree|stash|gc|prune|config|remote)|-fdx|--hard|rm[[:space:]]+-[a-zA-Z]*[rR]|--force|rm[[:space:]]+-rf'; then
+if pf_code_matches "$ALL" 'git[[:space:]]+(clean|reset|checkout|switch|restore|add|commit|fetch|pull|push|clone|worktree|stash|gc|prune|config|remote)|-fdx|--hard|rm[[:space:]]+-[a-zA-Z]*[rR]|--force|rm[[:space:]]+-rf'; then
     pf_fail "STATIC_GIT_MUTATION"
 fi
 
 # Flutter is run with the constant and nothing else: the word "analyze" is the
 # only action, no option is spelled, and no other tool is mentioned as command.
-if pf_code_matches "$ANALYZE" 'flutter[[:space:]]+(pub|test|build|clean|upgrade|doctor|config|create|run|precache|devices|emulators|install|--)|--no-pub|--fatal|--no-fatal|--watch|--suggestions|--write|--dart-define|pub[[:space:]]+get|dart[[:space:]]+(pub|run|analyze|test|compile|fix|format)|xcodebuild[[:space:]]+-?(build|archive|clean|test)|xcrun|simctl|ENSURE|--version'; then
+if pf_code_matches "$ALL" 'flutter[[:space:]]+(pub|test|build|clean|upgrade|doctor|config|create|run|precache|devices|emulators|install|--)|--no-pub|--fatal|--no-fatal|--watch|--suggestions|--write|--dart-define|pub[[:space:]]+get|dart[[:space:]]+(pub|run|analyze|test|compile|fix|format)|xcodebuild[[:space:]]+-?(build|archive|clean|test)|xcrun|simctl|ENSURE|--version'; then
     pf_fail "STATIC_TOOL_ACTION"
 fi
 
 [[ "$(grep -c '^readonly CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT="analyze"$' "$ANALYZE")" -eq 1 ]] || pf_fail "STATIC_ARGUMENT_CONSTANT"
-ARGUMENT_USES="$(grep -n 'CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT' "$ANALYZE" | grep -Ev '^[0-9]+:[[:space:]]*#|^[0-9]+:readonly ' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
-[[ "$ARGUMENT_USES" == '"$flutter" "$CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT" </dev/null 2>/dev/null)"' ]] || pf_fail "STATIC_ARGUMENT_USES_$ARGUMENT_USES"
+ARGUMENT_USES="$(grep -n 'CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT' "$ALL" | grep -Ev '^[0-9]+:[[:space:]]*#|^[0-9]+:readonly ' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
+[[ "$ARGUMENT_USES" == '_cbs_flutter_qual_ex_execute "$flutter" "$CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT"' ]] || pf_fail "STATIC_ARGUMENT_USES_$ARGUMENT_USES"
 
-# The command comes from the PATH lookup of PREFLIGHT, and only from there.
-[[ "$(grep -c '_cbs_flutter_qual_pf_find_tool' "$ANALYZE")" -eq 1 ]] || pf_fail "STATIC_FIND_TOOL"
+# The command comes from the PATH lookup of PREFLIGHT, and only from there. It
+# is looked up by the operation file: the engine never looks a tool up, never
+# names a command and never spells the argument of an operation.
+[[ "$(grep -c '_cbs_flutter_qual_pf_find_tool' "$ALL")" -eq 1 ]] || pf_fail "STATIC_FIND_TOOL"
 pf_code_matches "$ANALYZE" '_cbs_flutter_qual_pf_find_tool flutter\)' || pf_fail "STATIC_FIND_TOOL_ARGUMENT"
+! pf_code_matches "$EXECUTION" '_cbs_flutter_qual_pf_find_tool|CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT|"analyze"' || pf_fail "STATIC_ENGINE_NAMES_A_COMMAND"
+! pf_code_matches "$EXECUTION" '(^|[^A-Za-z_./-])(flutter|dart|xcodebuild|xcrun|simctl)([^A-Za-z_]|$)' || pf_fail "STATIC_ENGINE_NAMES_A_TOOL"
 
 # The bash processes started: the supervisor (fixed text) and, from it, the
 # runner (fixed text). Nothing else is exec'd outside those texts.
-BASH_STARTS="$(grep -En '"\$\{BASH:-bash\}"' "$ANALYZE" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
+BASH_STARTS="$(grep -En '"\$\{BASH:-bash\}"' "$ALL" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
 EXPECTED_BASH_STARTS='( cd "$dir" && exec "${BASH:-bash}" -c "$runner" cbs-analyze-runner "$contract" "$out" "$((cap + 1))" "$@" ) </dev/null &
-AN_RUN_RAW="$("${BASH:-bash}" -c "$CBS_FLUTTER_QUAL_ANALYZE_SUPERVISOR" cbs-analyze-supervisor \'
+EX_RUN_RAW="$("${BASH:-bash}" -c "$CBS_FLUTTER_QUAL_EXEC_SUPERVISOR" cbs-analyze-supervisor \'
 [[ "$BASH_STARTS" == "$EXPECTED_BASH_STARTS" ]] || pf_fail "STATIC_BASH_START_LIST"
 
 EXECS="$(grep -En '(^|[;&|({[:space:]])exec[[:space:]]' "$OUTSIDE" | grep -Ev '^[0-9]+:[[:space:]]*#' || true)"
@@ -559,20 +581,23 @@ kill -KILL -- "-$child"
 [[ "$SUP_KILLS" == "$EXPECTED_SUP_KILLS" ]] || pf_fail "STATIC_SUPERVISOR_KILL_LIST"
 
 # No backtick substitution, no application, no network tool named, no state outside.
-if grep -F '`' "$ANALYZE" | grep -Ev '^[[:space:]]*#' >/dev/null; then
+if grep -F '`' "$ALL" | grep -Ev '^[[:space:]]*#' >/dev/null; then
     pf_fail "STATIC_BACKTICK"
 fi
-if pf_code_matches "$ANALYZE" '[Aa][Mm][Hh]|[Uu][Ss][Rr]-|core-platform|apps/|packages/|/tmp|\$HOME|~/'; then
+if pf_code_matches "$ALL" '[Aa][Mm][Hh]|[Uu][Ss][Rr]-|core-platform|apps/|packages/|/tmp|\$HOME|~/'; then
     pf_fail "STATIC_APPLICATION_DEPENDENCY"
 fi
-if pf_code_matches "$ANALYZE" 'cbs/remote|remote_|ssh|bin/cbs'; then
+if pf_code_matches "$ALL" 'cbs/remote|remote_|ssh|bin/cbs'; then
     pf_fail "STATIC_COMPONENT_COUPLING"
 fi
 
 # Neither the executor nor its texts change the shell state of a caller that
-# sources it: no "set -e" / "set -u" outside the guarded main.
+# sources it: no "set -e" / "set -u" outside the guarded main (which belongs to
+# the operation file: the engine is a library and has none).
 SET_OUTSIDE="$(grep -En '^[[:space:]]*set[[:space:]]+[-+]' "$OUTSIDE" | grep -Ev '^[0-9]+:[[:space:]]*#' | sed -e 's/^[0-9]*://' -e 's/^[[:space:]]*//')"
 [[ "$SET_OUTSIDE" == "set -u" ]] || pf_fail "STATIC_SHELL_STATE_$SET_OUTSIDE"
+! grep -Eq '^[[:space:]]*set[[:space:]]+[-+]' "$OUTSIDE_ENGINE" || pf_fail "STATIC_ENGINE_SHELL_STATE"
+! grep -Fq 'BASH_SOURCE[0]}" == "$0"' "$EXECUTION" || pf_fail "STATIC_ENGINE_HAS_MAIN"
 
 echo "${TEST_PREFIX}_STATIC_SCAN=PASS"
 

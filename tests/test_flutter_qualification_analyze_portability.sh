@@ -20,6 +20,7 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANALYZE="$ROOT/cbs/qualification/flutter/analyze.sh"
+EXECUTION="$ROOT/cbs/qualification/flutter/execution.sh"
 CONTRACT="$ROOT/cbs/qualification/flutter/contract.sh"
 TEST_PREFIX="TEST_FLUTTER_QUALIFICATION_ANALYZE_PORTABILITY"
 
@@ -30,7 +31,7 @@ source "$CONTRACT"
 
 # ---------------------------------------------------------------- 0. files and syntax
 
-CODE_FILES="$ANALYZE $ROOT/tests/fixtures/flutter_qualification/analyze_lib.sh"
+CODE_FILES="$ANALYZE $EXECUTION $ROOT/tests/fixtures/flutter_qualification/analyze_lib.sh"
 TEST_FILES="$ROOT/tests/test_flutter_qualification_analyze.sh $ROOT/tests/test_flutter_qualification_analyze_security.sh"
 
 for file in $CODE_FILES $TEST_FILES "$ROOT/tests/test_flutter_qualification_analyze_portability.sh"; do
@@ -65,39 +66,46 @@ for file in $CODE_FILES $TEST_FILES; do
     fi
 done
 
-# The executor itself reaches only these tools directly (everything else comes
-# through PREFLIGHT, the contract and the isolation manager).
+# The executor itself (the operation file and the common engine it sources)
+# reaches only these tools directly (everything else comes through PREFLIGHT,
+# the contract and the isolation manager).
 for tool in tr grep awk cat tail cut sort uniq wc date stat readlink realpath basename ls od; do
-    if pf_code_matches "$ANALYZE" "(^|[;&|({]|\\\$\\()[[:space:]]*${tool}[[:space:]]"; then
-        pf_fail "STATIC_UNEXPECTED_TOOL_$tool"
-    fi
+    for executor_file in "$ANALYZE" "$EXECUTION"; do
+        if pf_code_matches "$executor_file" "(^|[;&|({]|\\\$\\()[[:space:]]*${tool}[[:space:]]"; then
+            pf_fail "STATIC_UNEXPECTED_TOOL_$tool"
+        fi
+    done
 done
 
 # No empty-array expansion under "set -u" (fatal in Bash 3.2): the only array
 # the executor expands is PIPESTATUS, which is never empty. "$@" is not an array
 # in this sense.
-ARRAYS="$(grep -Ev '^[[:space:]]*#' "$ANALYZE" | grep -Eo '\$\{[A-Za-z_][A-Za-z0-9_]*\[[@*]\]\}' | sort -u || true)"
+ARRAYS="$(cat "$ANALYZE" "$EXECUTION" | grep -Ev '^[[:space:]]*#' | grep -Eo '\$\{[A-Za-z_][A-Za-z0-9_]*\[[@*]\]\}' | sort -u || true)"
 [[ "$ARRAYS" == '${PIPESTATUS[@]}' ]] || pf_fail "STATIC_ARRAY_EXPANSIONS_$ARRAYS"
 
 # Bounded repetitions of the regular expressions stay under the 255 limit of
 # the BSD regular expression library, and no regular expression is written
 # inline (a quoted right-hand side is literal in Bash 3.2).
-BOUNDS="$(grep -Ev '^[[:space:]]*#' "$ANALYZE" |
+BOUNDS="$(cat "$ANALYZE" "$EXECUTION" | grep -Ev '^[[:space:]]*#' |
     grep -Eo '\{[0-9]+(,[0-9]+)?\}' | tr -d '{}' | tr ',' ' ' || true)"
 
 for bound in $BOUNDS; do
     [[ "$bound" -le 255 ]] || pf_fail "STATIC_REGEX_REPETITION_OVER_255_$bound"
 done
 
-if pf_code_matches "$ANALYZE" '=~[[:space:]]+[^$[:space:]]'; then
-    pf_fail "STATIC_REGEX_NOT_IN_VARIABLE"
-fi
+for executor_file in "$ANALYZE" "$EXECUTION"; do
+    if pf_code_matches "$executor_file" '=~[[:space:]]+[^$[:space:]]'; then
+        pf_fail "STATIC_REGEX_NOT_IN_VARIABLE"
+    fi
+done
 
 # The texts run by a fresh bash do not use "case" inside "$( )" (Bash 3.2
 # parsing), nor here-strings.
-if pf_code_matches "$ANALYZE" '<<<'; then
-    pf_fail "STATIC_HERE_STRING"
-fi
+for executor_file in "$ANALYZE" "$EXECUTION"; do
+    if pf_code_matches "$executor_file" '<<<'; then
+        pf_fail "STATIC_HERE_STRING"
+    fi
+done
 
 echo "${TEST_PREFIX}_STATIC_SCAN=PASS"
 
