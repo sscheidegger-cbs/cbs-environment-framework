@@ -17,9 +17,13 @@ qualified on macOS).** `contract.sh` is independent of any business application
 and runs nothing. `preflight.sh` (read-only), `analyze.sh` ("ANALYZE"),
 `test.sh` ("TEST") and `build_ios.sh` ("BUILD_IOS") are the only executors;
 `execution.sh` is a library, not an executor.
-`REPORT` is declared by the contract and is **not implemented**. The `TEST` and
-`BUILD_IOS` tests use shims only: no real Flutter, Dart, Xcode or simulator has
-been run for them, and no native macOS run of `TEST` or `BUILD_IOS` is claimed.
+`REPORT` (D04b-C.2h, `report.sh`, section "REPORT" below) is implemented and
+tested on Linux with synthetic evidence only; it is never run on a Mac or on real
+evidence, and not qualified on macOS. It is a read-only observer, not an
+executor. The `TEST` and `BUILD_IOS` tests use shims only: no real Flutter, Dart,
+Xcode or simulator has been run for them by those suites (the macOS qualification
+of `BUILD_IOS` with Flutter 3.47.6 is reported by the operator, not by this
+repository).
 
 ## Components
 
@@ -36,8 +40,10 @@ been run for them, and no native macOS run of `TEST` or `BUILD_IOS` is claimed.
 - `analyze.sh`: operation `ANALYZE` (below). It sources `execution.sh`.
 - `test.sh`: operation `TEST` (below). It sources `execution.sh`.
 - `build_ios.sh`: operation `BUILD_IOS` (below). It sources `execution.sh`.
+- `report.sh`: operation `REPORT` (below). It sources `contract.sh` only: it does
+  not load `execution.sh` or `preflight.sh`, and runs no operation.
 
-Not part of these steps: `REPORT`, any CLI entry (`bin/cbs`
+Not part of these steps: any CLI entry (`bin/cbs`
 is unchanged), any SSH transport (`cbs/remote/` is unchanged), any change to the
 worktree isolation (`cbs/worktree/` is unchanged).
 
@@ -571,6 +577,137 @@ those of ANALYZE:
   `BUILD_IOS` was only run against shims, on Linux. The first real run on the Mac
   is the qualification of this operation.
 
+## REPORT
+
+```bash
+bash cbs/qualification/flutter/report.sh KEY=VALUE...
+```
+
+The arguments are the request of the contract (data only, same validation, no new
+request format). `actions` must contain `report` (otherwise `ACTION_NOT_ALLOWED`,
+key `actions`). `report.sh` sources `contract.sh` only. It consolidates the
+evidence that the other operations already left, and nothing else:
+
+- it never runs `PREFLIGHT`, `ANALYZE`, `TEST` or `BUILD_IOS`, and never calls
+  Flutter, Dart, Xcode, `simctl`, Git, SSH or the network;
+- it never creates, modifies, moves, cleans or deletes anything (evidence,
+  checkouts, isolations, source repository). It writes **no** `REPORT.result`: the
+  contract defines no evidence file for `REPORT`, and the evidence of a
+  qualification is never changed afterwards. The answer is on stdout;
+- it never follows a symbolic link, never sources, evaluates or executes a
+  `.result` file, and never prints what a file contains.
+
+### Selection
+
+The selected operations are the actions of the request that name `PREFLIGHT`,
+`ANALYZE`, `TEST` or `BUILD_IOS`, in the contract order. An operation that is not
+selected is `SKIPPED` (`NOT_SELECTED`, 137) and its file is never read, even when
+one exists. `REPORT` is not part of the consolidation.
+
+### Evidence read
+
+```text
+<evidence_root>/<qualification_id>/ANALYZE.result
+<evidence_root>/<qualification_id>/TEST.result
+<evidence_root>/<qualification_id>/BUILD_IOS.result
+```
+
+`evidence_root` must exist and, like the `<qualification_id>` directory when it
+exists, be a directory of the user, without symbolic link in any component, not
+writable by group or others (otherwise the whole report is refused:
+`BLOCKED` / `PATH_NOT_ALLOWED`, key `evidence_root` or `qualification_id`). An
+absent `<qualification_id>` directory is not a refusal: no operation left evidence.
+
+A `.result` file is read line by line as data: at most 8192 bytes and 40 lines,
+every line `KEY=VALUE` with the characters `A-Za-z0-9._+-` in the value, keys
+taken from the closed list of the answer of the operation (the facts
+`CBS_FLUTTER_QUAL_<OPERATION>_*` written by the engine and the generic lines of the
+contract), no duplicate, the final result as the last line, a final newline. It
+must be coherent:
+
+- the operation, the operation result, the final result and the reasons agree, and
+  agree with the contract (reason of the class of the result, return code of the
+  reason). The result is `PASS` or `FAIL`: the only results an executor writes,
+  because it writes only after the evidence was opened. A `PASS` carries a tool
+  status of `0`;
+- `QUALIFICATION_ID` is the one of the request and `COMMIT_OBSERVED` is exactly the
+  `commit` of the request;
+- the `PREFLIGHT` recorded in the file is `PASS` (an executor starts only after a
+  `PASS`), and its evidence is `WRITTEN` (`FAILED` is accepted for a `FAIL` only).
+
+The `.log` is neither read nor checked (size and checksum are not compared with
+the facts of the answer).
+
+### Result of each operation
+
+| Situation | Result | Reason | RC | Evidence |
+|-----------|--------|--------|----|----------|
+| not selected | `SKIPPED` | `NOT_SELECTED` | 137 | `NOT_SELECTED` |
+| coherent answer | the one of the file (`PASS` or `FAIL`, its reason, its tool status) | | | `READ` |
+| no file and no trace | `NOT_RUN` | `NOT_EXECUTED` | 135 | `ABSENT` |
+| `.log` or `.log.partial` without `.result` (a run without answer) | `BLOCKED` | `INPUT_INVALID` | 121 | `REJECTED` |
+| malformed or incoherent file | `BLOCKED` | `INPUT_INVALID` | 121 | `REJECTED` |
+| symbolic link, file not regular, not owned by the user, writable by group or others | `BLOCKED` | `PATH_NOT_ALLOWED` | 124 | `REJECTED` |
+
+A refusal of an operation before its evidence was opened (request refused,
+`PREFLIGHT_NOT_PASSED`, ...) writes nothing: it cannot be told from an operation
+never launched, and both are `NOT_RUN`. `REPORT` never turns an absence into a
+`PASS`.
+
+`PREFLIGHT` has no evidence file in the contract: it writes nothing. Its only
+recorded trace is the `PREFLIGHT_RESULT` fact of the `.result` of the other
+operations. When `PREFLIGHT` is selected and at least one selected operation has a
+coherent file, it is `PASS` with the evidence `DERIVED`; otherwise it is
+`NOT_RUN` / `NOT_EXECUTED` (`ABSENT`). A qualification that selected `PREFLIGHT`
+alone (or whose other files are all absent or refused) is therefore never
+consolidated as `PASS`: that is a limit of the contract (see "Open decisions").
+
+### Consolidated result
+
+`cbs_flutter_qual_aggregate` of the contract over the results of `PREFLIGHT`,
+`ANALYZE`, `TEST` and `BUILD_IOS`: `FAIL`, then `BLOCKED`, then `NOT_RUN` win over
+`PASS`; `SKIPPED` alone is never a `PASS` (`report` selected alone is `NOT_RUN`).
+The reason is the one of the first operation, in contract order, that carries the
+consolidated result (`NOT_EXECUTED` when there is nothing but `SKIPPED`). The exit
+status is the contract code of that reason (`0` for `PASS`), like the executors.
+
+### Output
+
+For each operation, in contract order (closed values only):
+
+```text
+CBS_FLUTTER_QUAL_REPORT_QUALIFICATION_ID=<id>
+CBS_FLUTTER_QUAL_REPORT_COMMIT_EXPECTED=<commit of the request>
+CBS_FLUTTER_QUAL_REPORT_COMMIT_OBSERVED=<same commit>  (only when an answer was read and checked)
+CBS_FLUTTER_QUAL_REPORT_<OPERATION>_RESULT=<RESULT>
+CBS_FLUTTER_QUAL_REPORT_<OPERATION>_REASON=<REASON>    (not for PASS)
+CBS_FLUTTER_QUAL_REPORT_<OPERATION>_RC=<contract code of the reason>
+CBS_FLUTTER_QUAL_REPORT_<OPERATION>_TOOL_RC=<tool status> (when the file records one)
+CBS_FLUTTER_QUAL_REPORT_<OPERATION>_EVIDENCE=<NOT_SELECTED|ABSENT|READ|DERIVED|REJECTED>
+```
+
+then the structured output of the contract for `CBS_FLUTTER_QUAL_OPERATION=REPORT`
+(its result and reason are the consolidated ones) and, last,
+`CBS_FLUTTER_QUAL_RESULT=<RESULT>`. When the whole report is refused (request,
+`report` not selected, evidence root or directory), only
+`CBS_FLUTTER_QUAL_REPORT_REJECTED_KEY` (when there is one),
+`CBS_FLUTTER_QUAL_REPORT_QUALIFICATION_ID` (once the request is valid) and the
+structured output of the contract are printed. The reason is repeated on stderr.
+
+### What REPORT does not control
+
+- The files are checked, then read: nothing makes the two atomic, a file swapped in
+  between by a process of the same user would be read. Evidence written after the
+  read is not seen.
+- It trusts the facts of a coherent `.result`: it does not check the `.log`, the
+  Flutter version, nor that the checkout still exists or is clean. It does not
+  compare the answers of different operations with one another beyond the
+  qualification identifier and the commit of the request.
+- It decides nothing about cleanup (`cleanup_policy`) and removes nothing.
+- The reasons `INPUT_INVALID` (incoherent or incomplete evidence) and
+  `PATH_NOT_ALLOWED` (unsafe evidence) are the closest reasons of the closed list
+  of the contract: it has no reason that names an unreadable evidence.
+
 ## Rules imposed on the future executor
 
 These rules are part of the contract. ANALYZE, TEST and BUILD_IOS apply them for
@@ -603,6 +740,21 @@ locations; final timeout and log bounds; durable evidence storage;
 beyond `--simulator --no-codesign` (no parameter exists in the contract, none was
 added; the command is to be confirmed on a real toolchain, see "BUILD_IOS").
 
+## Open decisions (REPORT)
+
+Not decided, and not settled by `report.sh` beyond what is written above:
+
+- `PREFLIGHT` leaves no evidence of its own. `REPORT` derives it from the
+  `PREFLIGHT_RESULT` fact of the other `.result` files, or reports `NOT_RUN`. Whether
+  `preflight.sh` should write a `PREFLIGHT.result` (a change of an existing script)
+  is a decision for the contract.
+- An operation refused before its evidence was opened and an operation never
+  launched are indistinguishable (both `NOT_RUN`).
+- Whether `REPORT` should write its own `REPORT.result` (the contract only says that
+  `REPORT` is not mutating) and whether the consolidated result should be the
+  result of the operation `REPORT` itself or kept apart from it.
+- A reason of the contract for an unreadable or incoherent evidence.
+
 ## Tests
 
 ```bash
@@ -618,7 +770,23 @@ bash tests/test_flutter_qualification_test.sh
 bash tests/test_flutter_qualification_test_security.sh
 bash tests/test_flutter_qualification_test_portability.sh
 bash tests/test_flutter_qualification_build_ios.sh
+bash tests/test_flutter_qualification_report.sh
 ```
+
+The `REPORT` test is deliberately small and does not copy the tests of the
+execution engine. It writes synthetic `.result` files, with the lines and the order
+of the engine, in a private directory (no Git repository, no isolation, no
+toolchain) and covers: the consolidation of coherent answers (`PASS`, `FAIL`,
+`SKIPPED`, a file of a non-selected operation ignored), an absent operation or
+directory (`NOT_RUN`, never `PASS`), incoherent or malformed answers (qualification
+or commit that differ, contradictory results, truncated, empty, without final
+newline, unknown or duplicate key, foreign line, secret-like and command-like
+content: refused, never executed, never printed, a run without answer), symbolic
+links (file, dangling link, evidence directory, evidence root), and the absence of
+any external tool (forbidden-tool shims first in `PATH`, never called; no
+redirection to a file, no `eval`, one `source` in the code; the evidence and the
+files outside it unchanged). It runs under a native Bash 3.2 when one is
+available (`NOT_RUN` otherwise).
 
 The `BUILD_IOS` test is deliberately small: the mechanisms of `execution.sh` are
 qualified by the ANALYZE and TEST suites and are not requalified. It covers the
@@ -894,3 +1062,22 @@ the first command is refused (dirty worktree): inspect it, and decide explicitly
 to do with the isolation; do not use `git reset` or `git clean` on it from this
 procedure. The previous isolation `amh-usr-d04-analyze-01` is not touched by any of
 these commands.
+
+
+### Observed macOS qualification — D04b-C.2g
+
+The BUILD_IOS executor was qualified on macOS with Flutter 3.47.6
+against the isolated AMH-USR commit
+`bc0ad39d8be6b42a0109b7de18a6104b038f3f92`.
+
+- Qualification ID: `amh-usr-d04-c2g-01`
+- Target: `ios-simulator`
+- PREFLIGHT: `PASS`
+- BUILD_IOS: `PASS`
+- Flutter tool return code: `0`
+- Duration: 18 seconds
+- Evidence: `WRITTEN`
+- Log truncated: `NO`
+
+This qualification does not establish native macOS qualification
+of the REPORT executor.
