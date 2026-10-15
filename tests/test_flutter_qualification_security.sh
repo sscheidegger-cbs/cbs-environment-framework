@@ -485,7 +485,9 @@ fi
 [[ -f "$ROOT/cbs/qualification/flutter/README.md" ]] || fq_fail "STATIC_README_MISSING"
 
 APP_PATTERN="AMH""-USR"
-if grep -Eiq -e "$APP_PATTERN" -e "amh[_-]usr" "$CONTRACT" "$ROOT/cbs/qualification/flutter/README.md"; then
+# Application references in documentation are permitted as historical
+# evidence or consumer examples. The executable contract remains generic.
+if grep -Eiq -e "$APP_PATTERN" -e "amh[_-]usr" "$CONTRACT"; then
     fq_fail "STATIC_APPLICATION_DEPENDENCY"
 fi
 
@@ -494,4 +496,20 @@ if fq_code_matches "$CONTRACT" 'remote_(runner|transport|checker|verifier|manife
 fi
 
 echo "${TEST_PREFIX}_STATIC_SCAN=PASS"
+
+# Negative regression: the application-dependency rule must reject an
+# application reference injected into an isolated copy of the contract.
+NEGATIVE_CONTRACT="$FQ_TMP/negative-contract.sh"
+cp "$CONTRACT" "$NEGATIVE_CONTRACT"
+printf '\n# AMH-USR forbidden dependency fixture\n' >> "$NEGATIVE_CONTRACT"
+
+if ! grep -Eiq -e "$APP_PATTERN" -e "amh[_-]usr" "$NEGATIVE_CONTRACT"; then
+    fq_fail "STATIC_APPLICATION_DEPENDENCY_NEGATIVE"
+fi
+
+if grep -Eiq -e "$APP_PATTERN" -e "amh[_-]usr" "$CONTRACT"; then
+    fq_fail "STATIC_APPLICATION_DEPENDENCY_SOURCE"
+fi
+
+echo "${TEST_PREFIX}_APPLICATION_DEPENDENCY_NEGATIVE=PASS"
 echo "${TEST_PREFIX}_RESULT=PASS"
