@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Simulated Git whose "status" operation fails. Every other operation is
+# delegated to the real Git given by CBS_REMOTE_TEST_REAL_GIT.
+
+set -u
+
+for argument in "$@"; do
+    if [[ "$argument" == "status" ]]; then
+        echo "fatal: simulated git status failure" >&2
+        exit 128
+    fi
+done
+
+exec "${CBS_REMOTE_TEST_REAL_GIT:?}" "$@"

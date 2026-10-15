@@ -227,3 +227,23 @@ cbs platform qualify <manifest>
 The Core Platform LOCAL binding delegates these actions to the existing Core lifecycle scripts.
 
 Independent instance creation, multi-instance runtime coexistence, remote deployment and release management are not qualified by B17b-G.
+
+## Remote
+
+Commands:
+
+```text
+cbs remote check <manifest>
+cbs remote run <manifest> <action>
+```
+
+Generic remote execution of allow-listed CBS commands over SSH. `check` is
+read-only. `run` verifies the remote repository (identity, branch, commit,
+clean worktree) and then runs the CBS command bound to the declared action.
+Results are `PASS`, `FAIL` or `BLOCKED`; the remote return code is preserved.
+
+See `cbs/remote/README.md` for the manifest format, the SSH contract, results
+and return codes.
+
+No implicit Git synchronisation is performed, and no free-form remote command
+is accepted.

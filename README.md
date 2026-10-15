@@ -66,6 +66,7 @@ replace platform-owned runtime logic or tests.
 - `cbs/stack/` - stack resolution and prerequisite evaluation.
 - `cbs/instance/` - instance observation and lifecycle support.
 - `cbs/platform/` - platform resolution and hook execution.
+- `cbs/remote/` - generic allow-listed SSH execution of CBS commands.
 - `stacks/` - reusable stack definitions.
 - `bindings/` - platform/project integration contracts where applicable.
 - `tests/` - framework tests.

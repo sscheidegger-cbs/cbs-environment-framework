@@ -648,3 +648,167 @@ multi-stack genericity across two heterogeneous real consumers.
 
 The historical B17 real-state tests remain preserved and excluded from the
 portable runner exactly as before.
+
+## D04b-B Remote orchestration test suite
+
+Qualified executable tests:
+
+```text
+tests/test_remote_contract.sh
+tests/test_remote_manifest.sh
+tests/test_remote_transport.sh
+tests/test_remote_check.sh
+tests/test_remote_run.sh
+tests/test_remote_cli.sh
+```
+
+Shared fixtures (not test entry points):
+
+```text
+tests/fixtures/remote/lib.sh
+tests/fixtures/remote/bin/ssh
+tests/fixtures/remote/git-status-fails/git
+```
+
+### Hermeticity
+
+The suite uses no network, no real SSH and no real remote repository.
+
+`tests/fixtures/remote/bin/ssh` is a simulated `ssh` placed first in `PATH`.
+It validates the option contract of the caller (option terminator,
+`BatchMode=yes`, `StrictHostKeyChecking=yes`), records what it received, then
+either simulates a failure (unreachable host, refused host key, broken
+connection, probe malfunction) or runs the received remote command line
+locally through `/bin/sh -c`, as a remote login shell would.
+
+Two per-invocation knobs let a test act between the two SSH sessions of
+`cbs remote run`: `FAKE_SSH_HOOK_ON_CALL` / `FAKE_SSH_HOOK` run a shell text
+just before the Nth session executes (a remote change after the first probe),
+and `FAKE_SSH_MODE_ON_CALL` / `FAKE_SSH_CALL_MODE` change the simulated mode of
+the Nth session only. The fixture CBS entrypoint can write a marker file kept
+outside the repositories, which proves whether it was started.
+
+The "remote host" is a directory of a temporary tree holding a real Git
+repository, created with a hermetic Git configuration (no user or system
+configuration). A second temporary repository plays the local reference. The
+remote path contains a space on purpose.
+
+Simulated Git is used where a Git failure must be provoked:
+`tests/fixtures/remote/git-status-fails/git` fails `git status` and delegates
+everything else to the real Git. Git absence on the remote host is simulated
+with an empty `PATH`.
+
+The temporary directories are removed on exit. Nothing under the real
+workspace, `~/.ssh` or `~/.cbs` is read or written.
+
+### Remote contract
+
+Validates contract and manifest versions, structured results, commit
+relations, return code uniqueness and non-collision with the Repository
+contract codes, the explicit allow-list of CBS commands that may be bound to
+an action (exact content compared entry by entry; no entry names an ensure,
+start, stop or installation operation; refused: `stack toolchains ensure`,
+`platform start|stop|check|status|qualify`, `runtime android ensure|start|stop`,
+incomplete prefixes and misplaced words), the launcher verdict vocabulary,
+unchanged existing return codes and result emission.
+
+### Remote manifest
+
+Validates a declarative manifest loader that parses and never sources:
+valid and optional keys, resolved values, relative local path resolution,
+unknown / duplicate / empty / indented / CRLF lines, missing keys,
+unsupported version, malformed values (destination, port, timeout, identity
+file, remote path, origin, branch, commit, entrypoint, action names), command
+injection attempts in values and in action commands, commands outside the
+allow-list (every entry accepted with arguments, mutating and platform-hook
+commands refused), undeclared or command-less actions, refusal of an origin carrying a
+password, and proof that manifest content is not executed.
+
+### Remote transport
+
+Validates POSIX quoting by round trip through `/bin/sh`, `bash`, `dash` and
+`zsh` when installed, on hostile values (quotes, `$()`, backticks, `;`, `&&`,
+pipes, redirections, globs, tilde, newlines, leading dashes, Unicode), absence
+of single quotes in the fixed remote scripts, the SSH option contract, optional
+port / timeout / identity options, and what the simulated `ssh` actually
+receives.
+
+It also validates the launcher: no mutating Git command in the script, every
+observation and refusal reason present, a single `exec` preceded only by the
+passing verdict line, execution of the launcher by every available remote
+shell (pass, refusal on commit, refusal on dirty worktree, entrypoint not
+started on refusal), the output filter (verdict consumed and reported, bytes
+after the verdict forwarded unchanged and unable to forge a verdict, malformed
+values ignored, no verdict) and the launch stream (ssh status preserved, 255
+without verdict).
+
+On the qualification host `zsh` is not installed, so the zsh round trip is
+reported as skipped (`TEST_REMOTE_TRANSPORT_ZSH=SKIPPED_NOT_INSTALLED`).
+
+### Remote check
+
+Validates PASS (local-reference and pinned commit, symbolic-link path) and the
+negative cases: host unavailable, refused host key, unknown destination, wrong
+commit (`UNKNOWN_OBJECT`, `BEHIND`, `AHEAD`, `DIVERGED`, pinned mismatch),
+unavailable local reference, wrong branch, detached `HEAD`, dirty repository
+(untracked, modified, staged), failing `git status`, origin mismatch or absence,
+masking of origin credentials, missing path, non-Git directory, file instead of
+directory, subdirectory of a repository, remote Git absent, missing or
+non-executable entrypoint, malfunctioning probe, local `ssh` absent, invalid
+manifest and usage errors.
+
+Every scenario also verifies that the remote repository (HEAD, branch, status,
+stash list) is unchanged, and that dirty content was neither cleaned nor reset.
+
+`check` is also verified to start nothing and never to send the launcher, and a
+change made after a passing `check` (dirty worktree, branch, commit, origin) is
+detected by the next `check`.
+
+### Remote run
+
+Validates execution of declared actions, working directory with a space,
+argument fidelity, preservation of the remote return code, standard output and
+standard error (including return codes 7 and 42), transport failure after
+verification, refusal of undeclared or hostile action names before any network
+access, and that nothing is executed when the repository is dirty, on the wrong
+commit, branch or origin, when the host is unreachable or when the entrypoint
+is missing.
+
+It validates the revalidation done by the launcher in the second SSH session:
+a remote change injected after the first probe (untracked, modified and staged
+files, branch change, detached `HEAD`, new commit, commit moved backwards,
+origin change, repository moved, entrypoint made non-executable or removed) is
+refused as `BLOCKED` with the usual reason and return code, in exactly two SSH
+sessions, with `CBS_REMOTE_ACTION_EXECUTION=START` absent, the fixture
+entrypoint never started, its output never seen and the remote state exactly as
+the change left it (no reset, clean, checkout or stash). It also validates a
+change between a passing `cbs remote check` and `cbs remote run`, the absence of
+any launch session after a refused probe, the impossibility for an action to
+forge the verdict, and the diagnostics: preflight refusal versus action failure
+versus ssh status 255 (action returning 255, broken connection with no verdict,
+launch session without verdict).
+
+### Remote CLI
+
+Validates help exposure, routing of `cbs remote check` and `cbs remote run`,
+return code propagation, unknown `remote` subcommands, usage errors,
+non-regression of existing command routing, structural guarantees (no `eval`,
+no sourcing of the manifest, no dynamic shell, no Git mutation or
+synchronisation, no recursive deletion, `BatchMode=yes` enforced) and the
+absence of hardcoded host address, user, secret material or versioned remote
+manifest. It also verifies that a launcher refusal reaches the CLI with the
+same result and return code, and that `stack toolchains ensure`,
+`platform start`, `platform stop` and `runtime android ensure` cannot be bound
+to an action (`MANIFEST_INVALID`, no SSH session).
+
+### D04b-B qualification boundary
+
+Qualified: the behavior of `cbs remote check` and `cbs remote run` against a
+simulated SSH and temporary local Git repositories.
+
+Not qualified by this suite: a real SSH connection, a real remote host, the
+macOS login shell (zsh) and macOS `PATH` behavior, remote execution of a real
+Flutter stack action, iOS build, and long-running remote actions.
+
+The portable runner `tests/run_portable_non_regression.sh` picks the new tests
+up automatically through its `tests/test_*.sh` glob.

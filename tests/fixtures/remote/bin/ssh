@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+
+# Hermetic SSH simulator used by the CBS Remote tests.
+#
+# It never opens a network connection. It validates the option contract of the
+# caller, records what it received and then either simulates a failure or
+# runs the received remote command line locally through /bin/sh -c, exactly as
+# a remote login shell would interpret it.
+#
+# Environment:
+#   FAKE_SSH_STATE   directory receiving invocation records (required)
+#   FAKE_SSH_MODE    exec (default) | nogit | unreachable | hostkey |
+#                    garbage | probe-fail
+#   FAKE_SSH_EXPECT_DESTINATION  optional: refuse any other destination (255)
+#   FAKE_SSH_FAIL_ON_CALL        optional N: the Nth invocation fails with 255
+#   FAKE_SSH_HOOK_ON_CALL        optional N: before the Nth invocation runs its
+#   FAKE_SSH_HOOK                remote command, run the shell text FAKE_SSH_HOOK
+#                                (simulates a change made on the remote host
+#                                between two SSH sessions)
+#   FAKE_SSH_MODE_ON_CALL        optional N: the Nth invocation uses the mode
+#   FAKE_SSH_CALL_MODE           FAKE_SSH_CALL_MODE instead of FAKE_SSH_MODE
+
+set -u
+
+state="${FAKE_SSH_STATE:?FAKE_SSH_STATE is required}"
+mode="${FAKE_SSH_MODE:-exec}"
+
+mkdir -p "$state"
+
+count=0
+[[ -f "$state/count" ]] && count="$(cat "$state/count")"
+count=$((count + 1))
+printf '%s' "$count" > "$state/count"
+
+if [[ "$#" -lt 3 ]]; then
+    echo "FAKE_SSH_ERROR=TOO_FEW_ARGUMENTS" >&2
+    exit 96
+fi
+
+args=("$@")
+last_index=$(($# - 1))
+remote_command="${args[$last_index]}"
+destination="${args[$((last_index - 1))]}"
+separator="${args[$((last_index - 2))]}"
+
+: > "$state/options.$count"
+for ((i = 0; i < last_index - 2; i++)); do
+    printf '%s\n' "${args[$i]}" >> "$state/options.$count"
+done
+
+printf '%s' "$destination" > "$state/destination.$count"
+printf '%s' "$remote_command" > "$state/command.$count"
+
+if [[ "$separator" != "--" ]]; then
+    echo "FAKE_SSH_ERROR=OPTION_TERMINATOR_MISSING" >&2
+    exit 96
+fi
+
+# The caller must never allow an interactive fallback.
+if ! grep -Fxq 'BatchMode=yes' "$state/options.$count"; then
+    echo "FAKE_SSH_ERROR=BATCHMODE_MISSING" >&2
+    exit 97
+fi
+
+if ! grep -Fxq 'StrictHostKeyChecking=yes' "$state/options.$count"; then
+    echo "FAKE_SSH_ERROR=STRICT_HOST_KEY_CHECKING_MISSING" >&2
+    exit 97
+fi
+
+if [[ -n "${FAKE_SSH_EXPECT_DESTINATION:-}" &&
+    "$destination" != "$FAKE_SSH_EXPECT_DESTINATION" ]]; then
+    echo "ssh: Could not resolve hostname $destination: Name or service not known" >&2
+    exit 255
+fi
+
+if [[ -n "${FAKE_SSH_FAIL_ON_CALL:-}" && "$count" -eq "$FAKE_SSH_FAIL_ON_CALL" ]]; then
+    echo "client_loop: send disconnect: Broken pipe" >&2
+    exit 255
+fi
+
+if [[ -n "${FAKE_SSH_HOOK_ON_CALL:-}" && "$count" -eq "$FAKE_SSH_HOOK_ON_CALL" ]]; then
+    /bin/sh -c "${FAKE_SSH_HOOK:?FAKE_SSH_HOOK is required}" < /dev/null ||
+        {
+            echo "FAKE_SSH_ERROR=HOOK_FAILED" >&2
+            exit 98
+        }
+fi
+
+if [[ -n "${FAKE_SSH_MODE_ON_CALL:-}" && "$count" -eq "$FAKE_SSH_MODE_ON_CALL" ]]; then
+    mode="${FAKE_SSH_CALL_MODE:?FAKE_SSH_CALL_MODE is required}"
+fi
+
+case "$mode" in
+    exec)
+        exec /bin/sh -c "$remote_command" < /dev/null
+        ;;
+    nogit)
+        exec env PATH=/nonexistent-cbs-remote-test-path \
+            /bin/sh -c "$remote_command" < /dev/null
+        ;;
+    unreachable)
+        echo "ssh: connect to host $destination port 22: Connection refused" >&2
+        exit 255
+        ;;
+    hostkey)
+        echo "Host key verification failed." >&2
+        exit 255
+        ;;
+    garbage)
+        echo "unrelated banner output"
+        exit 0
+        ;;
+    probe-fail)
+        echo "FAKE_SSH_REMOTE_DIAGNOSTIC=probe exploded" >&2
+        exit 3
+        ;;
+    *)
+        echo "FAKE_SSH_ERROR=UNKNOWN_MODE" >&2
+        exit 96
+        ;;
+esac
