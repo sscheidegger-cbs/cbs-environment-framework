@@ -3,10 +3,12 @@
 Generic contract for the local qualification of a Flutter application on an
 iOS simulator, inside a Git checkout isolated by CBS.
 
-**Status: contract and hermetic tests only (D04b-C.2b, step 1).** There is no
-executor yet. Nothing in this directory runs Flutter, Dart, Xcode, `simctl`,
-Git or SSH, creates a worktree, or writes a file. The contract is independent
-of any business application.
+**Status: contract, PREFLIGHT and ANALYZE (D04b-C.2b).** `contract.sh` is
+independent of any business application and runs nothing. `preflight.sh`
+(read-only) and `analyze.sh` (this document, "ANALYZE") are the only executors.
+`TEST`, `BUILD_IOS` and `REPORT` are declared by the contract and are **not
+implemented**. Everything is tested with shims only: no real Flutter, Dart,
+Xcode or simulator has been run, and no native macOS run is claimed.
 
 ## Components
 
@@ -15,10 +17,14 @@ of any business application.
   repository, at a fixed path derived from its own location) and defines
   functions only.
 
-Not part of this step: the fixed-action executor, the evidence collector, any
-CLI entry (`bin/cbs` is unchanged), any SSH transport (`cbs/remote/` is
-unchanged), any change to the worktree isolation (`cbs/worktree/` is
-unchanged).
+- `preflight.sh`: read-only observation of the checkout, the toolchain and the
+  simulator (operation `PREFLIGHT`). Unchanged by ANALYZE.
+- `analyze.sh`: operation `ANALYZE` (below). It sources `preflight.sh`, which
+  sources `contract.sh`.
+
+Not part of this step: `TEST`, `BUILD_IOS`, `REPORT`, any CLI entry (`bin/cbs`
+is unchanged), any SSH transport (`cbs/remote/` is unchanged), any change to the
+worktree isolation (`cbs/worktree/` is unchanged).
 
 ## Reuse
 
@@ -220,9 +226,117 @@ and gives the physical path.
   still avoid secret scenarios in the initial qualification and must pass every
   log through redaction before writing it.
 
+## ANALYZE
+
+```bash
+bash cbs/qualification/flutter/analyze.sh KEY=VALUE...
+```
+
+The arguments are the request of the contract (data only, same validation).
+`actions` must contain `analyze` (otherwise `ACTION_NOT_ALLOWED`, which the
+contract already requires to come after `preflight`).
+
+Sequence, each step stopping the operation:
+
+1. validate the request with `contract.sh`;
+2. check the evidence location (below) before anything runs;
+3. run `PREFLIGHT` on the same request; ANALYZE continues only when its result
+   is exactly `PASS` (`cbs_flutter_qual_gate_allows`), otherwise
+   `NOT_RUN` / `PREFLIGHT_NOT_PASSED` (136), nothing executed, nothing written.
+   PREFLIGHT is what verifies, read-only, that the checkout
+   `isolation_root/isolation_id` is owned by CBS (isolation manager `verify`),
+   the exact commit and origin, a detached clean `HEAD`, and the toolchain;
+4. check the checkout path again (`ISOLATION_REJECTED` if it is not a plain
+   directory inside the isolation root) and find `flutter` in the absolute
+   entries of `PATH` (`TOOL_UNAVAILABLE` if it vanished);
+5. create the evidence directory and run `flutter analyze` once.
+
+### The command
+
+Exactly `flutter analyze`: the single argument is the constant
+`CBS_FLUTTER_QUAL_ANALYZE_ARGUMENT`. No value of the request, of the checkout or
+of the environment is part of the command; there is no `eval`, no `source` of
+anything but the two fixed files, no option (`--no-pub` and the like are an open
+decision). The tool is run from the isolated checkout, never from the source
+repository, with `LC_ALL=C` and its standard input closed.
+
+### Bounds
+
+- Timeout: `timeout_seconds`. A fixed supervisor runs the command in its own
+  process group, then sends `TERM` and, 1 second later, `KILL` to that group.
+  Output captured so far is kept.
+- Output: redacted line by line (`cbs_flutter_qual_redact_stream`) **before** it
+  is written, then capped at `log_max_bytes`. Exceeding the cap is
+  `LOG_LIMIT_EXCEEDED` (133), whatever the tool status; the log keeps the first
+  `log_max_bytes` bytes and `LOG_TRUNCATED=YES`.
+
+### Results
+
+| Result    | Reason                  | RC  | When |
+|-----------|-------------------------|-----|------|
+| `PASS`    | -                       | 0   | `flutter` exited with `0` (tool status `0`) |
+| `FAIL`    | `COMMAND_FAILED`        | 130 | non-zero exit; the exact status is `OPERATION_TOOL_RC` |
+| `FAIL`    | `TIMEOUT`               | 131 | `timeout_seconds` elapsed |
+| `FAIL`    | `LOG_LIMIT_EXCEEDED`    | 133 | output over `log_max_bytes` |
+| `FAIL`    | `EVIDENCE_FAILURE`      | 134 | the evidence could not be written |
+| `BLOCKED` | `ACTION_NOT_ALLOWED` and the other request reasons | 120..125 | request refused |
+| `BLOCKED` | `PATH_NOT_ALLOWED`      | 124 | evidence root not usable, or evidence already present |
+| `BLOCKED` | `ISOLATION_REJECTED`    | 126 | checkout path not a plain directory in the isolation root |
+| `BLOCKED` | `TOOL_UNAVAILABLE`      | 127 | `flutter` not found after PREFLIGHT |
+| `NOT_RUN` | `PREFLIGHT_NOT_PASSED`  | 136 | PREFLIGHT result is not `PASS` |
+
+`NETWORK_FAILURE` is never emitted: classifying it needs the real messages of
+the tool, which are not frozen. A killed tool (status 137) is a `COMMAND_FAILED`
+with that status; a status the executor cannot read is never reported as a
+success.
+
+### Output
+
+The structured output of the contract, preceded by closed facts
+(`CBS_FLUTTER_QUAL_ANALYZE_*`: `QUALIFICATION_ID`, `COMMIT_OBSERVED`,
+`PREFLIGHT_RESULT`, `PREFLIGHT_REASON`, `FLUTTER_VERSION`, `COMMAND`,
+`DURATION_SECONDS`, `LOG_BYTES`, `LOG_CRC`, `LOG_TRUNCATED`, `EVIDENCE`,
+`REJECTED_KEY`). Every fact is checked against a closed pattern before it is
+printed; tool output is never part of the answer. The last stdout line is
+`CBS_FLUTTER_QUAL_RESULT=<RESULT>`. The exit status is the contract code of the
+reason (`0` for `PASS`).
+
+### Evidence
+
+```text
+<evidence_root>/<qualification_id>/ANALYZE.log      redacted, bounded output
+<evidence_root>/<qualification_id>/ANALYZE.result   the structured answer
+```
+
+`evidence_root` must already exist (it is never created here), be a directory
+owned by the user, not writable by group or others, and without symbolic link in
+any component. The directory `<qualification_id>` is created (mode 700, no
+`-p`) unless it already exists as a private directory of the same kind; files
+are created with an exclusive create (mode 600). If `ANALYZE.log`,
+`ANALYZE.result` or `ANALYZE.log.partial` already exists (a dangling link counts
+as existing), the run is refused (`PATH_NOT_ALLOWED`): nothing is overwritten,
+followed or deleted. The only file removed is the temporary capture
+`ANALYZE.log.partial` of the same run. Evidence is never written in the
+checkout or the source repository.
+
+### What ANALYZE does not control
+
+- `flutter analyze` itself may write in the checkout (`.dart_tool/`,
+  `pubspec.lock`, ...) and in the caches of the user (`HOME`, pub cache, Flutter
+  SDK cache). The source repository is neither written nor read. A checkout
+  dirtied by the tool is refused by the next PREFLIGHT (dirty tree): a new
+  isolation is needed to run again.
+- A process the tool detaches into another session or process group is outside
+  the supervision of the timeout.
+- With `KILL` (tool ignoring `TERM`) the tail of the output not yet read by the
+  filter may be lost.
+- The commit and origin are those PREFLIGHT verified; the content of the commit
+  is trusted (analyzing code runs the build hooks of its packages).
+
 ## Rules imposed on the future executor
 
-These rules are part of the contract; they are not implemented in this step.
+These rules are part of the contract. ANALYZE applies them for its own operation;
+the other executors are not implemented.
 
 - Run only in the checkout created and verified by the CBS isolation manager,
   and revalidate it before every operation. Never run on the source repository.
@@ -242,8 +356,9 @@ These rules are part of the contract; they are not implemented in this step.
 ## Open decisions (not frozen)
 
 Test selection strategy beyond `test_scope` / `test_targets`; exact Flutter
-command options; simulator management; cache locations; final timeout and log
-bounds; durable evidence storage.
+command options (including for `flutter analyze`); simulator management; cache
+locations; final timeout and log bounds; durable evidence storage;
+`NETWORK_FAILURE` classification.
 
 ## Tests
 
@@ -251,11 +366,19 @@ bounds; durable evidence storage.
 bash tests/test_flutter_qualification_contract.sh
 bash tests/test_flutter_qualification_security.sh
 bash tests/test_flutter_qualification_portability.sh
+bash tests/test_flutter_qualification_preflight.sh
+bash tests/test_flutter_qualification_preflight_security.sh
+bash tests/test_flutter_qualification_analyze.sh
+bash tests/test_flutter_qualification_analyze_security.sh
+bash tests/test_flutter_qualification_analyze_portability.sh
 ```
 
-The tests are hermetic: forbidden-tool shims (`flutter`, `dart`, `xcrun`,
-`xcodebuild`, `simctl`, `git`, `ssh`, `scp`, `curl`, `wget`, `open`) are placed
-first in `PATH` and must remain uncalled. They run on Linux and are meant to run
+The contract tests are hermetic: forbidden-tool shims (`flutter`, `dart`,
+`xcrun`, `xcodebuild`, `simctl`, `git`, `ssh`, `scp`, `curl`, `wget`, `open`) are
+placed first in `PATH` and must remain uncalled. The PREFLIGHT and ANALYZE tests
+use real Git repositories and real CBS isolations in a private directory, with
+shims for Flutter, Dart, Xcode and `simctl` as the only such tools on `PATH`;
+they run the suites sequentially (one at a time). They run on Linux and are meant to run
 on macOS with `/bin/bash` 3.2; the portability test reports separately whether a
 native Bash 3.2 was available (`NOT_RUN` otherwise). Qualification on a real Mac
 and with a real toolchain is a later step (D04b-C.2c) and is not claimed here.
