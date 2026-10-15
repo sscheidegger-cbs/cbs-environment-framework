@@ -8,13 +8,15 @@ local `path:` dependencies (D04b-C.2c, section "Local path dependencies"
 below; implemented and tested on Linux, not qualified on macOS), and the
 extraction of the common execution engine (D04b-C.2e step 1, `execution.sh`,
 section "Common execution engine" below; implemented and tested on Linux, native
-macOS qualification pending).** `contract.sh` is
+macOS qualification pending), and the operation `TEST` (D04b-C.2f, `test.sh`,
+section "TEST" below; implemented and tested on Linux with shims only, never run
+with a real Flutter toolchain, not qualified on macOS).** `contract.sh` is
 independent of any business application and runs nothing. `preflight.sh`
-(read-only) and `analyze.sh` (this document, "ANALYZE") are the only executors;
-`execution.sh` is a library, not an executor.
-`TEST`, `BUILD_IOS` and `REPORT` are declared by the contract and are **not
-implemented**. Everything is tested with shims only: no real Flutter, Dart,
-Xcode or simulator has been run, and no native macOS run is claimed.
+(read-only), `analyze.sh` ("ANALYZE") and `test.sh` ("TEST") are the only
+executors; `execution.sh` is a library, not an executor.
+`BUILD_IOS` and `REPORT` are declared by the contract and are **not
+implemented**. The `TEST` tests use shims only: no real Flutter, Dart, Xcode or
+simulator has been run for `TEST`, and no native macOS run of `TEST` is claimed.
 
 ## Components
 
@@ -29,8 +31,9 @@ Xcode or simulator has been run, and no native macOS run is claimed.
   (below, "Common execution engine"). Sourced, defines functions only. It
   sources `preflight.sh`, which sources `contract.sh`.
 - `analyze.sh`: operation `ANALYZE` (below). It sources `execution.sh`.
+- `test.sh`: operation `TEST` (below). It sources `execution.sh`.
 
-Not part of this step: `TEST`, `BUILD_IOS`, `REPORT`, any CLI entry (`bin/cbs`
+Not part of these steps: `BUILD_IOS`, `REPORT`, any CLI entry (`bin/cbs`
 is unchanged), any SSH transport (`cbs/remote/` is unchanged), any change to the
 worktree isolation (`cbs/worktree/` is unchanged).
 
@@ -359,10 +362,107 @@ historical names for now.
 - The commit and origin are those PREFLIGHT verified; the content of the commit
   is trusted (analyzing code runs the build hooks of its packages).
 
+## TEST
+
+```bash
+bash cbs/qualification/flutter/test.sh KEY=VALUE...
+```
+
+The arguments are the request of the contract (data only, same validation).
+`actions` must contain `test` (otherwise `ACTION_NOT_ALLOWED`) and the request
+carries `test_scope`. `test.sh` sources `execution.sh` and does not duplicate
+it: validation, evidence location, PREFLIGHT gate, checkout check, supervision,
+timeout, redaction, log bound, classification, structured answer and evidence
+files are those of ANALYZE (above), with `TEST` as the operation (`TEST.log`,
+`TEST.result`, facts `CBS_FLUTTER_QUAL_TEST_*`). The tool is looked up in the
+absolute entries of `PATH`, run from the isolated checkout (never the source
+repository), with `LC_ALL=C` and its standard input closed.
+
+### The command
+
+The words `test` and (integration only) `-d` are constants of `test.sh`. The
+only values of the request that reach the command are the test files and, for
+`integration`, the simulator identifier, as separate words of a command that is
+never parsed by a shell. No Flutter option or argument is accepted from a
+caller; secrets and `--dart-define` are refused by the contract.
+
+| `test_scope`  | `test_targets` | Command |
+|---------------|----------------|---------|
+| `unit_widget` | absent         | `flutter test` |
+| `unit_widget` | present        | `flutter test <file>...` (order of the request) |
+| `integration` | present        | `flutter test <file>... -d <simulator_udid>` |
+| `integration` | absent         | refused, see "Open decision" |
+
+For `unit_widget`, a `simulator_udid` given in the request is not used.
+
+Files are checked in the isolated checkout, before anything runs and without
+writing: no component of the path is a symbolic link, the file exists and is a
+regular file. A missing file is `INPUT_INVALID` (121); a symbolic link or a file
+that is not regular is `PATH_NOT_ALLOWED` (124); the rejected key is
+`test_targets`. Without `test_targets`, the `test` directory of the checkout
+must not be, nor contain, a symbolic link (`PATH_NOT_ALLOWED`, key
+`test_scope`); a missing `test` directory is left to `flutter`, which reports it
+(`FAIL`).
+
+### Open decision: `integration` without `test_targets`
+
+`contract.sh` accepts `test_scope=integration` without `test_targets`, and it is
+unchanged. No command that is both safe and explicit can be derived from such a
+request: `flutter test` alone runs the `test` directory, not the integration
+tests, and naming the `integration_test` directory would be a selection the
+caller never validated. `TEST` therefore refuses that request on its own, before
+PREFLIGHT: `BLOCKED`, `INPUT_INVALID` (121), key `test_targets`, nothing
+executed, nothing written. Whether the contract should require `test_targets`
+for `integration`, or define a default selection, is **not decided**.
+
+### Simulator (integration)
+
+`PREFLIGHT` must be `PASS` first. `TEST` then observes the requested simulator
+again, read-only (`xcrun simctl list devices`, the observation of
+`preflight.sh`), because `execution.sh` does not expose the state observed by
+PREFLIGHT. The run starts only if the simulator is `BOOTED`. A `SHUTDOWN` or
+transitional simulator, a simulator that vanished or a failed observation is
+`BLOCKED` / `SIMULATOR_UNAVAILABLE` (129), key `simulator_udid`, nothing
+executed. `TEST` never boots, creates, erases or deletes a simulator, and only
+the explicit `simulator_udid` is used (no alias).
+
+### Results
+
+| Result    | Reason                  | RC  | When |
+|-----------|-------------------------|-----|------|
+| `PASS`    | -                       | 0   | `flutter` exited with `0` (tool status `0`) |
+| `FAIL`    | `COMMAND_FAILED`        | 130 | non-zero exit; the exact status is `OPERATION_TOOL_RC` |
+| `FAIL`    | `TIMEOUT`               | 131 | `timeout_seconds` elapsed |
+| `FAIL`    | `LOG_LIMIT_EXCEEDED`    | 133 | output over `log_max_bytes` |
+| `FAIL`    | `EVIDENCE_FAILURE`      | 134 | the evidence could not be written |
+| `BLOCKED` | `INPUT_INVALID`         | 121 | request refused; test file absent; `integration` without `test_targets` |
+| `BLOCKED` | request reasons         | 122..125 | request refused (`PATH_NOT_ALLOWED` also: link or irregular test file, evidence not usable or already present) |
+| `BLOCKED` | `ISOLATION_REJECTED`    | 126 | checkout path not a plain directory in the isolation root |
+| `BLOCKED` | `TOOL_UNAVAILABLE`      | 127 | `flutter` not found after PREFLIGHT |
+| `BLOCKED` | `SIMULATOR_UNAVAILABLE` | 129 | `integration`: simulator not `BOOTED` |
+| `NOT_RUN` | `PREFLIGHT_NOT_PASSED`  | 136 | PREFLIGHT result is not `PASS` |
+
+`NETWORK_FAILURE` is never emitted. Evidence rules (location, exclusive
+creation, modes, no overwrite, redaction, bound) are those of ANALYZE.
+
+### What TEST does not control
+
+- The same limits as ANALYZE (writes of `flutter` in the checkout and caches, a
+  process detached from the process group, tail of the output lost on `KILL`).
+  `flutter test` may dirty the checkout: the next PREFLIGHT refuses a dirty tree.
+- The `-d <udid>` form is the constant chosen by this file; it has **not** been
+  confirmed on a real toolchain, nor has the behaviour of `flutter test` on an
+  integration test.
+- The check of the test files and the observation of the simulator happen before
+  the run: the checkout or the simulator may change in between (no atomicity).
+- Test files ignored by Git and absent from the commit are not detected beyond
+  the existence check in the checkout; only symbolic links, absence and
+  non-regular files are refused.
+
 ## Rules imposed on the future executor
 
-These rules are part of the contract. ANALYZE applies them for its own operation;
-the other executors are not implemented.
+These rules are part of the contract. ANALYZE and TEST apply them for their own
+operation; the other executors are not implemented.
 
 - Run only in the checkout created and verified by the CBS isolation manager,
   and revalidate it before every operation. Never run on the source repository.
@@ -381,8 +481,11 @@ the other executors are not implemented.
 
 ## Open decisions (not frozen)
 
-Test selection strategy beyond `test_scope` / `test_targets`; exact Flutter
-command options (including for `flutter analyze`); simulator management; cache
+Rule for `test_scope=integration` without `test_targets` (accepted by the
+contract, refused by `TEST`, see "TEST"); test selection strategy beyond
+`test_scope` / `test_targets`; exact Flutter command options (including for
+`flutter analyze` and `flutter test`, and the form of the device option);
+simulator management; cache
 locations; final timeout and log bounds; durable evidence storage;
 `NETWORK_FAILURE` classification.
 
@@ -397,11 +500,14 @@ bash tests/test_flutter_qualification_preflight_security.sh
 bash tests/test_flutter_qualification_analyze.sh
 bash tests/test_flutter_qualification_analyze_security.sh
 bash tests/test_flutter_qualification_analyze_portability.sh
+bash tests/test_flutter_qualification_test.sh
+bash tests/test_flutter_qualification_test_security.sh
+bash tests/test_flutter_qualification_test_portability.sh
 ```
 
 The contract tests are hermetic: forbidden-tool shims (`flutter`, `dart`,
 `xcrun`, `xcodebuild`, `simctl`, `git`, `ssh`, `scp`, `curl`, `wget`, `open`) are
-placed first in `PATH` and must remain uncalled. The PREFLIGHT and ANALYZE tests
+placed first in `PATH` and must remain uncalled. The PREFLIGHT, ANALYZE and TEST tests
 use real Git repositories and real CBS isolations in a private directory, with
 shims for Flutter, Dart, Xcode and `simctl` as the only such tools on `PATH`;
 they run the suites sequentially (one at a time). They run on Linux and are meant to run
