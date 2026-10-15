@@ -95,7 +95,7 @@ do
     M_ALLOWED="mutating"
     M_EXTRA="CBS_REMOTE_ACTION_MUTATING_COMMAND=$mutating"
     remote_test_write_manifest "$MANIFEST"
-    sed -i '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
+    remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
 
     remote_test_run "$CBS" remote run "$MANIFEST" mutating
     remote_test_expect_rc "$CBS_RC_REMOTE_MANIFEST_INVALID" "MUTATING_REFUSED:$mutating"
@@ -202,6 +202,32 @@ fi
 
 if grep -RnE '(^|[[:space:]])rm[[:space:]]+-[A-Za-z]*[rR]' "$ROOT/cbs/remote"; then
     remote_test_fail "DESTRUCTIVE_DELETE"
+fi
+
+# Bash 3.2 and BSD tool compatibility (macOS): none of the Bash 4+ or GNU-only
+# constructs below (associative arrays, the global flag of declare, namerefs,
+# case conversion expansions, array-reading builtins, in-place sed) may appear
+# in the component, its fixtures or its tests. The patterns are written so that
+# they do not match their own text.
+PORTABILITY_TARGETS=("$ROOT/cbs/remote" "$ROOT/tests/fixtures/remote")
+
+for portability_test in "$ROOT"/tests/test_remote_*.sh; do
+    PORTABILITY_TARGETS+=("$portability_test")
+done
+
+if grep -RnE -e 'declare -[a-zA-Z]*[Agn]([[:space:]]|$)' \
+    -e 'typeset -[a-zA-Z]*[Agn]([[:space:]]|$)' \
+    -e 'local -[a-zA-Z]*[An]([[:space:]]|$)' \
+    -e 'readonly -[a-zA-Z]*A' \
+    -e '\$\{[^}]*(\^\^|,,)[^}]*\}' \
+    -e '\$\{[A-Za-z_][A-Za-z0-9_]*[\^,][^}]*\}' \
+    -e '(^|[^A-Za-z_])(map''file|read''array)([^A-Za-z_]|$)' \
+    -e 'sed -[a-zA-Z]*i' \
+    -e '\[\[ -v ' \
+    -e '&>''>|\|''&' \
+    "${PORTABILITY_TARGETS[@]}"
+then
+    remote_test_fail "BASH_4_OR_GNU_ONLY_CONSTRUCT"
 fi
 
 echo "TEST_REMOTE_CLI_STRUCTURAL_GUARANTEES=PASS"

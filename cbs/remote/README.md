@@ -390,6 +390,28 @@ reading relies on the design of the probe (a fixed script that ends with
 6. launcher revalidation, then exec         (second SSH session, one script)
 ```
 
+## Portability
+
+The component runs with Bash 3.2 (the `/bin/bash` of macOS) as well as with
+current Bash versions, and its tests use only options common to GNU and BSD
+tools.
+
+- No associative array: the manifest configuration, the resolved values and the
+  probe observations are indexed arrays of `KEY=VALUE` entries read through
+  `cbs_remote_cfg_*`, `cbs_remote_resolved_*` and `cbs_remote_probe_*`. A key is
+  compared as a plain string; it is never a variable name, a subscript or shell
+  code, and nothing is evaluated.
+- No global flag of `declare`: shared variables are plain assignments, and the
+  allow-list is a plain array made `readonly`.
+- No case conversion expansion: `cbs_remote_ascii_upper` and
+  `cbs_remote_ascii_lower` convert ASCII letters in pure Bash, independently of
+  the locale.
+- The origin length bound (1024 characters) is checked apart from the character
+  set, because the BSD regular expression library limits repetition counts to
+  255.
+- The single quotes of `cbs_remote_quote` are escaped without quoting inside
+  the pattern substitution, which Bash 3.2 would keep literally.
+
 ## Limits
 
 - Verification and execution use two SSH connections. The launcher repeats

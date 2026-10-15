@@ -12,7 +12,7 @@ REMOTE_TRANSPORT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source "$REMOTE_TRANSPORT_DIR/contract.sh"
 
-declare -ga CBS_REMOTE_SSH_ARGV=()
+CBS_REMOTE_SSH_ARGV=()
 CBS_REMOTE_SSH_DESTINATION=""
 CBS_REMOTE_SSH_STDOUT=""
 CBS_REMOTE_SSH_RC=0
@@ -197,7 +197,10 @@ cbs_remote_quote() {
     local quote="'"
     local replacement="'\\''"
 
-    printf "'%s'" "${value//"$quote"/"$replacement"}"
+    # The pattern and the replacement are deliberately not quoted: with Bash
+    # 3.2, quotes inside a double-quoted substitution are kept literally.
+    # Neither contains a glob character or a space, so nothing else changes.
+    printf "'%s'" "${value//$quote/$replacement}"
 }
 
 # Quotes every argument and joins them with single spaces.
@@ -218,9 +221,12 @@ cbs_remote_ssh_is_available() {
 
 # Builds the fixed SSH argument vector from the loaded manifest.
 cbs_remote_ssh_prepare() {
-    local timeout="${CBS_REMOTE_CFG[CBS_REMOTE_SSH_CONNECT_TIMEOUT]:-$CBS_REMOTE_DEFAULT_CONNECT_TIMEOUT}"
+    local timeout
+    local port
 
-    CBS_REMOTE_SSH_DESTINATION="${CBS_REMOTE_CFG[CBS_REMOTE_SSH_DESTINATION]}"
+    timeout="$(cbs_remote_cfg_get CBS_REMOTE_SSH_CONNECT_TIMEOUT "$CBS_REMOTE_DEFAULT_CONNECT_TIMEOUT")"
+
+    CBS_REMOTE_SSH_DESTINATION="$(cbs_remote_cfg_get CBS_REMOTE_SSH_DESTINATION)"
 
     CBS_REMOTE_SSH_ARGV=(
         ssh
@@ -240,14 +246,15 @@ cbs_remote_ssh_prepare() {
         -o PermitLocalCommand=no
     )
 
-    if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_PORT]+x}" ]]; then
-        CBS_REMOTE_SSH_ARGV+=(-p "$((10#${CBS_REMOTE_CFG[CBS_REMOTE_SSH_PORT]}))")
+    if cbs_remote_cfg_has CBS_REMOTE_SSH_PORT; then
+        port="$(cbs_remote_cfg_get CBS_REMOTE_SSH_PORT)"
+        CBS_REMOTE_SSH_ARGV+=(-p "$((10#$port))")
     fi
 
-    if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_IDENTITY_FILE]+x}" ]]; then
+    if cbs_remote_cfg_has CBS_REMOTE_SSH_IDENTITY_FILE; then
         CBS_REMOTE_SSH_ARGV+=(
             -o IdentitiesOnly=yes
-            -i "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_IDENTITY_FILE]}"
+            -i "$(cbs_remote_cfg_get CBS_REMOTE_SSH_IDENTITY_FILE)"
         )
     fi
 }
@@ -259,10 +266,10 @@ cbs_remote_probe_command() {
     printf '/bin/sh -c %s sh %s' \
         "$(cbs_remote_quote "$CBS_REMOTE_PROBE_SCRIPT")" \
         "$(cbs_remote_quote_join \
-            "${CBS_REMOTE_CFG[CBS_REMOTE_PATH_PREPEND]:-}" \
-            "${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_PATH]}" \
+            "$(cbs_remote_cfg_get CBS_REMOTE_PATH_PREPEND)" \
+            "$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_PATH)" \
             "$expected_commit" \
-            "${CBS_REMOTE_RESOLVED[ENTRYPOINT]}")"
+            "$(cbs_remote_resolved_get ENTRYPOINT)")"
 }
 
 # Remote command line for a declared action.
@@ -276,12 +283,12 @@ cbs_remote_launch_command() {
     printf '/bin/sh -c %s sh %s' \
         "$(cbs_remote_quote "$CBS_REMOTE_LAUNCH_SCRIPT")" \
         "$(cbs_remote_quote_join \
-            "${CBS_REMOTE_CFG[CBS_REMOTE_PATH_PREPEND]:-}" \
-            "${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_PATH]}" \
-            "${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_ORIGIN]}" \
-            "${CBS_REMOTE_CFG[CBS_REMOTE_EXPECTED_BRANCH]}" \
+            "$(cbs_remote_cfg_get CBS_REMOTE_PATH_PREPEND)" \
+            "$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_PATH)" \
+            "$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_ORIGIN)" \
+            "$(cbs_remote_cfg_get CBS_REMOTE_EXPECTED_BRANCH)" \
             "$expected_commit" \
-            "${CBS_REMOTE_RESOLVED[ENTRYPOINT]}" \
+            "$(cbs_remote_resolved_get ENTRYPOINT)" \
             "$@")"
 }
 

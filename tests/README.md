@@ -801,6 +801,21 @@ same result and return code, and that `stack toolchains ensure`,
 `platform start`, `platform stop` and `runtime android ensure` cannot be bound
 to an action (`MANIFEST_INVALID`, no SSH session).
 
+### Portability (Bash 3.2, BSD tools)
+
+The remote suites avoid Bash 4+ and GNU-only constructs: no associative array,
+no global `declare`, no case conversion expansion, no in-place `sed -i`. In-place
+edits of a fixture manifest go through `remote_test_sed_inplace`
+(`tests/fixtures/remote/lib.sh`): extended regular expression script (`sed -E`),
+temporary file created next to the target, target rewritten only when `sed`
+succeeded, temporary file always removed. `test_remote_cli.sh` fails if one of
+these constructs reappears in `cbs/remote`, `tests/fixtures/remote` or the
+`tests/test_remote_*.sh` suites.
+
+`test_remote_contract.sh` also covers the Bash 3.2 compatible lookup and case
+helpers and the read-only allow-list; `test_remote_manifest.sh` covers the
+1024-character origin bound.
+
 ### D04b-B qualification boundary
 
 Qualified: the behavior of `cbs remote check` and `cbs remote run` against a

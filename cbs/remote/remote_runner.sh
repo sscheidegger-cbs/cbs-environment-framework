@@ -52,7 +52,7 @@ cbs_remote_run() {
         return "$CBS_RC_REMOTE_ACTION_NOT_ALLOWED"
     fi
 
-    command="${CBS_REMOTE_RESOLVED[ACTION_$action]}"
+    command="$(cbs_remote_resolved_get "ACTION_$action")"
 
     printf 'CBS_REMOTE_ACTION_COMMAND=cbs %s\n' "$command"
 

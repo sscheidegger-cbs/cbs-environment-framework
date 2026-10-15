@@ -12,9 +12,61 @@ REMOTE_MANIFEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source "$REMOTE_MANIFEST_DIR/contract.sh"
 
-declare -gA CBS_REMOTE_CFG=()
-declare -gA CBS_REMOTE_RESOLVED=()
-declare -ga CBS_REMOTE_ACTIONS=()
+# Keyed stores (Bash 3.2 has no associative array): indexed arrays of
+# "KEY=VALUE" entries, read only through the accessors below. A manifest key is
+# never used as a variable name or as a subscript.
+#   CBS_REMOTE_CFG_ENTRIES       manifest key -> declared value
+#   CBS_REMOTE_RESOLVED_ENTRIES  ENTRYPOINT, LOCAL_REPOSITORY, ACTION_<name>
+CBS_REMOTE_CFG_ENTRIES=()
+CBS_REMOTE_RESOLVED_ENTRIES=()
+CBS_REMOTE_ACTIONS=()
+
+# Arguments: KEY
+cbs_remote_cfg_has() {
+    cbs_remote_entries_has "$1" \
+        ${CBS_REMOTE_CFG_ENTRIES[@]+"${CBS_REMOTE_CFG_ENTRIES[@]}"}
+}
+
+# Arguments: KEY [DEFAULT]. Prints the declared value (DEFAULT, empty unless
+# given, when the key is absent). Use cbs_remote_cfg_has to test presence.
+cbs_remote_cfg_get() {
+    cbs_remote_entries_get "$1" "${2-}" \
+        ${CBS_REMOTE_CFG_ENTRIES[@]+"${CBS_REMOTE_CFG_ENTRIES[@]}"}
+}
+
+# Arguments: KEY VALUE. The key must not already be present.
+cbs_remote_cfg_add() {
+    CBS_REMOTE_CFG_ENTRIES+=("$1=$2")
+}
+
+# Arguments: KEY
+cbs_remote_resolved_has() {
+    cbs_remote_entries_has "$1" \
+        ${CBS_REMOTE_RESOLVED_ENTRIES[@]+"${CBS_REMOTE_RESOLVED_ENTRIES[@]}"}
+}
+
+# Arguments: KEY [DEFAULT]
+cbs_remote_resolved_get() {
+    cbs_remote_entries_get "$1" "${2-}" \
+        ${CBS_REMOTE_RESOLVED_ENTRIES[@]+"${CBS_REMOTE_RESOLVED_ENTRIES[@]}"}
+}
+
+# Arguments: KEY VALUE. Replaces the value of an existing key.
+cbs_remote_resolved_set() {
+    local key="$1"
+    local value="$2"
+    local count="${#CBS_REMOTE_RESOLVED_ENTRIES[@]}"
+    local index
+
+    for ((index = 0; index < count; index++)); do
+        if [[ "${CBS_REMOTE_RESOLVED_ENTRIES[$index]%%=*}" == "$key" ]]; then
+            CBS_REMOTE_RESOLVED_ENTRIES[$index]="$key=$value"
+            return 0
+        fi
+    done
+
+    CBS_REMOTE_RESOLVED_ENTRIES+=("$key=$value")
+}
 
 cbs_remote_manifest_error() {
     local code="$1"
@@ -76,8 +128,8 @@ cbs_remote_manifest_read() {
     local value
     local line_number=0
 
-    CBS_REMOTE_CFG=()
-    CBS_REMOTE_RESOLVED=()
+    CBS_REMOTE_CFG_ENTRIES=()
+    CBS_REMOTE_RESOLVED_ENTRIES=()
     CBS_REMOTE_ACTIONS=()
 
     [[ -f "$file" && -r "$file" ]] ||
@@ -100,7 +152,7 @@ cbs_remote_manifest_read() {
         key="${BASH_REMATCH[1]}"
         value="${BASH_REMATCH[2]}"
 
-        if [[ -n "${CBS_REMOTE_CFG[$key]+x}" ]]; then
+        if cbs_remote_cfg_has "$key"; then
             cbs_remote_manifest_error "DUPLICATE_KEY" "$key"
             return 1
         fi
@@ -110,20 +162,24 @@ cbs_remote_manifest_read() {
             return 1
         fi
 
-        CBS_REMOTE_CFG["$key"]="$value"
+        cbs_remote_cfg_add "$key" "$value"
     done < "$file"
 }
 
 cbs_remote_manifest_validate_actions() {
-    local allowed="${CBS_REMOTE_CFG[CBS_REMOTE_ALLOWED_ACTIONS]}"
+    local allowed
     local name
     local key
+    local entry
+    local suffix
     local command
     local word
     local index
     local -a names=()
     local -a words=()
-    local -A declared=()
+    local -a declared=()
+
+    allowed="$(cbs_remote_cfg_get CBS_REMOTE_ALLOWED_ACTIONS)"
 
     if [[ "$allowed" == *"  "* || "$allowed" == " "* || "$allowed" == *" " ]]; then
         cbs_remote_manifest_error "INVALID_VALUE" "CBS_REMOTE_ALLOWED_ACTIONS"
@@ -138,24 +194,31 @@ cbs_remote_manifest_validate_actions() {
             return 1
         fi
 
-        if [[ -n "${declared[$name]+x}" ]]; then
+        if cbs_remote_word_in_list "$name" \
+            ${declared[@]+"${declared[@]}"}
+        then
             cbs_remote_manifest_error "DUPLICATE_ACTION" "$name"
             return 1
         fi
 
-        declared["$name"]=1
+        declared+=("$name")
     done
 
     # Every key must be a known static key or the command of a declared action.
-    for key in "${!CBS_REMOTE_CFG[@]}"; do
+    for entry in ${CBS_REMOTE_CFG_ENTRIES[@]+"${CBS_REMOTE_CFG_ENTRIES[@]}"}; do
+        key="${entry%%=*}"
+
         if cbs_remote_manifest_static_key_is_known "$key"; then
             continue
         fi
 
         if [[ "$key" =~ ^CBS_REMOTE_ACTION_([A-Z][A-Z0-9_]*)_COMMAND$ ]]; then
-            name="${BASH_REMATCH[1],,}"
+            suffix="${BASH_REMATCH[1]}"
+            name="$(cbs_remote_ascii_lower "$suffix")"
 
-            if [[ -n "${declared[$name]+x}" ]]; then
+            if cbs_remote_word_in_list "$name" \
+                ${declared[@]+"${declared[@]}"}
+            then
                 continue
             fi
 
@@ -168,14 +231,15 @@ cbs_remote_manifest_validate_actions() {
     done
 
     for name in "${names[@]}"; do
-        key="CBS_REMOTE_ACTION_${name^^}_COMMAND"
+        suffix="$(cbs_remote_ascii_upper "$name")"
+        key="CBS_REMOTE_ACTION_${suffix}_COMMAND"
 
-        if [[ -z "${CBS_REMOTE_CFG[$key]+x}" ]]; then
+        if ! cbs_remote_cfg_has "$key"; then
             cbs_remote_manifest_error "ACTION_COMMAND_MISSING" "$key"
             return 1
         fi
 
-        command="${CBS_REMOTE_CFG[$key]}"
+        command="$(cbs_remote_cfg_get "$key")"
 
         if [[ "$command" == *"  "* || "$command" == " "* || "$command" == *" " ]]; then
             cbs_remote_manifest_error "INVALID_VALUE" "$key"
@@ -212,7 +276,7 @@ cbs_remote_manifest_validate_actions() {
         fi
 
         CBS_REMOTE_ACTIONS+=("$name")
-        CBS_REMOTE_RESOLVED["ACTION_$name"]="$command"
+        cbs_remote_resolved_set "ACTION_$name" "$command"
     done
 }
 
@@ -231,27 +295,27 @@ cbs_remote_manifest_validate() {
         CBS_REMOTE_EXPECTED_COMMIT \
         CBS_REMOTE_ALLOWED_ACTIONS
     do
-        if [[ -z "${CBS_REMOTE_CFG[$required]+x}" ]]; then
+        if ! cbs_remote_cfg_has "$required"; then
             cbs_remote_manifest_error "MISSING_KEY" "$required"
             return 1
         fi
     done
 
-    if [[ "${CBS_REMOTE_CFG[CBS_REMOTE_MANIFEST_VERSION]}" != "$CBS_REMOTE_MANIFEST_VERSION" ]]; then
+    if [[ "$(cbs_remote_cfg_get CBS_REMOTE_MANIFEST_VERSION)" != "$CBS_REMOTE_MANIFEST_VERSION" ]]; then
         cbs_remote_manifest_error "UNSUPPORTED_VERSION" "CBS_REMOTE_MANIFEST_VERSION"
         return 1
     fi
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_ID]}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_ID)"
     cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_ID" ||
         { cbs_remote_manifest_error "INVALID_VALUE" "CBS_REMOTE_ID"; return 1; }
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_SSH_DESTINATION]}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_SSH_DESTINATION)"
     cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_DESTINATION" ||
         { cbs_remote_manifest_error "INVALID_VALUE" "CBS_REMOTE_SSH_DESTINATION"; return 1; }
 
-    if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_PORT]+x}" ]]; then
-        value="${CBS_REMOTE_CFG[CBS_REMOTE_SSH_PORT]}"
+    if cbs_remote_cfg_has CBS_REMOTE_SSH_PORT; then
+        value="$(cbs_remote_cfg_get CBS_REMOTE_SSH_PORT)"
 
         if [[ ! "$value" =~ $CBS_REMOTE_PATTERN_UINT ]] ||
             ((10#$value < 1 || 10#$value > 65535))
@@ -261,8 +325,8 @@ cbs_remote_manifest_validate() {
         fi
     fi
 
-    if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_CONNECT_TIMEOUT]+x}" ]]; then
-        value="${CBS_REMOTE_CFG[CBS_REMOTE_SSH_CONNECT_TIMEOUT]}"
+    if cbs_remote_cfg_has CBS_REMOTE_SSH_CONNECT_TIMEOUT; then
+        value="$(cbs_remote_cfg_get CBS_REMOTE_SSH_CONNECT_TIMEOUT)"
 
         if [[ ! "$value" =~ $CBS_REMOTE_PATTERN_UINT ]] ||
             ((10#$value < 1 || 10#$value > 120))
@@ -272,8 +336,8 @@ cbs_remote_manifest_validate() {
         fi
     fi
 
-    if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_IDENTITY_FILE]+x}" ]]; then
-        value="${CBS_REMOTE_CFG[CBS_REMOTE_SSH_IDENTITY_FILE]}"
+    if cbs_remote_cfg_has CBS_REMOTE_SSH_IDENTITY_FILE; then
+        value="$(cbs_remote_cfg_get CBS_REMOTE_SSH_IDENTITY_FILE)"
 
         if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_PATH" ||
             [[ "$value" != /* ]] ||
@@ -284,8 +348,8 @@ cbs_remote_manifest_validate() {
         fi
     fi
 
-    if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_PATH_PREPEND]+x}" ]]; then
-        value="${CBS_REMOTE_CFG[CBS_REMOTE_PATH_PREPEND]}"
+    if cbs_remote_cfg_has CBS_REMOTE_PATH_PREPEND; then
+        value="$(cbs_remote_cfg_get CBS_REMOTE_PATH_PREPEND)"
 
         if [[ ! "$value" =~ $CBS_REMOTE_PATTERN_PATH_LIST ]] ||
             cbs_remote_path_has_parent_segment "$value"
@@ -295,7 +359,7 @@ cbs_remote_manifest_validate() {
         fi
     fi
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_PATH]}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_PATH)"
 
     if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_PATH" ||
         [[ "$value" != /* ]] ||
@@ -305,9 +369,11 @@ cbs_remote_manifest_validate() {
         return 1
     fi
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_ORIGIN]}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_ORIGIN)"
 
-    if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_ORIGIN"; then
+    if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_ORIGIN" ||
+        [[ "${#value}" -gt "$CBS_REMOTE_ORIGIN_MAX_LENGTH" ]]
+    then
         cbs_remote_manifest_error "INVALID_VALUE" "CBS_REMOTE_REPOSITORY_ORIGIN"
         return 1
     fi
@@ -318,7 +384,7 @@ cbs_remote_manifest_validate() {
         return 1
     fi
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_EXPECTED_BRANCH]}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_EXPECTED_BRANCH)"
 
     if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_BRANCH" ||
         [[ "$value" == *".."* || "$value" == */ || "$value" == *.lock ]]
@@ -327,15 +393,15 @@ cbs_remote_manifest_validate() {
         return 1
     fi
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_EXPECTED_COMMIT]}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_EXPECTED_COMMIT)"
 
     if [[ "$value" == "$CBS_REMOTE_EXPECTED_COMMIT_LOCAL_HEAD" ]]; then
-        if [[ -z "${CBS_REMOTE_CFG[CBS_REMOTE_LOCAL_REPOSITORY_PATH]+x}" ]]; then
+        if ! cbs_remote_cfg_has CBS_REMOTE_LOCAL_REPOSITORY_PATH; then
             cbs_remote_manifest_error "MISSING_KEY" "CBS_REMOTE_LOCAL_REPOSITORY_PATH"
             return 1
         fi
 
-        value="${CBS_REMOTE_CFG[CBS_REMOTE_LOCAL_REPOSITORY_PATH]}"
+        value="$(cbs_remote_cfg_get CBS_REMOTE_LOCAL_REPOSITORY_PATH)"
 
         if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_PATH"; then
             cbs_remote_manifest_error "INVALID_VALUE" "CBS_REMOTE_LOCAL_REPOSITORY_PATH"
@@ -343,9 +409,9 @@ cbs_remote_manifest_validate() {
         fi
 
         if [[ "$value" == /* ]]; then
-            CBS_REMOTE_RESOLVED[LOCAL_REPOSITORY]="$value"
+            cbs_remote_resolved_set LOCAL_REPOSITORY "$value"
         else
-            CBS_REMOTE_RESOLVED[LOCAL_REPOSITORY]="$manifest_dir/$value"
+            cbs_remote_resolved_set LOCAL_REPOSITORY "$manifest_dir/$value"
         fi
     else
         if [[ ! "$value" =~ $CBS_REMOTE_PATTERN_COMMIT ]]; then
@@ -353,13 +419,13 @@ cbs_remote_manifest_validate() {
             return 1
         fi
 
-        if [[ -n "${CBS_REMOTE_CFG[CBS_REMOTE_LOCAL_REPOSITORY_PATH]+x}" ]]; then
+        if cbs_remote_cfg_has CBS_REMOTE_LOCAL_REPOSITORY_PATH; then
             cbs_remote_manifest_error "UNUSED_KEY" "CBS_REMOTE_LOCAL_REPOSITORY_PATH"
             return 1
         fi
     fi
 
-    value="${CBS_REMOTE_CFG[CBS_REMOTE_CBS_ENTRYPOINT]:-$CBS_REMOTE_DEFAULT_ENTRYPOINT}"
+    value="$(cbs_remote_cfg_get CBS_REMOTE_CBS_ENTRYPOINT "$CBS_REMOTE_DEFAULT_ENTRYPOINT")"
 
     if ! cbs_remote_value_matches "$value" "$CBS_REMOTE_PATTERN_PATH" ||
         [[ "$value" != */* || "$value" == */ ]] ||
@@ -369,13 +435,14 @@ cbs_remote_manifest_validate() {
         return 1
     fi
 
-    CBS_REMOTE_RESOLVED[ENTRYPOINT]="$value"
+    cbs_remote_resolved_set ENTRYPOINT "$value"
 
     cbs_remote_manifest_validate_actions
 }
 
-# Loads and validates a manifest. On success CBS_REMOTE_CFG and
-# CBS_REMOTE_ACTIONS are populated. Returns 1 on any invalid manifest.
+# Loads and validates a manifest. On success CBS_REMOTE_CFG_ENTRIES,
+# CBS_REMOTE_RESOLVED_ENTRIES and CBS_REMOTE_ACTIONS are populated. Returns 1
+# on any invalid manifest.
 cbs_remote_manifest_load() {
     local manifest="${1:-}"
     local manifest_dir

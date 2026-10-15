@@ -29,7 +29,21 @@ CBS_REMOTE_OUTCOME_REASON=""
 CBS_REMOTE_OUTCOME_RC=0
 CBS_REMOTE_EXPECTED_COMMIT_RESOLVED=""
 
-declare -gA CBS_REMOTE_PROBE=()
+# Observations reported by the probe (Bash 3.2 has no associative array): an
+# indexed array of "KEY=VALUE" entries, read only through the accessors below.
+CBS_REMOTE_PROBE_ENTRIES=()
+
+# Arguments: KEY [DEFAULT]. Prints the observed value, or DEFAULT (empty unless
+# given) when the probe did not report the key or reported it empty.
+cbs_remote_probe_get() {
+    cbs_remote_entries_get "$1" "${2-}" \
+        ${CBS_REMOTE_PROBE_ENTRIES[@]+"${CBS_REMOTE_PROBE_ENTRIES[@]}"}
+}
+
+cbs_remote_probe_has() {
+    cbs_remote_entries_has "$1" \
+        ${CBS_REMOTE_PROBE_ENTRIES[@]+"${CBS_REMOTE_PROBE_ENTRIES[@]}"}
+}
 
 cbs_remote_outcome() {
     CBS_REMOTE_OUTCOME_RESULT="$1"
@@ -55,15 +69,16 @@ cbs_remote_probe_parse() {
     local key
     local value
 
-    CBS_REMOTE_PROBE=()
+    CBS_REMOTE_PROBE_ENTRIES=()
 
     while IFS= read -r line; do
         if [[ "$line" =~ ^CBS_REMOTE_PROBE_([A-Z_]+)=(.*)$ ]]; then
             key="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
 
-            if [[ -z "${CBS_REMOTE_PROBE[$key]+x}" ]]; then
-                CBS_REMOTE_PROBE["$key"]="$value"
+            # The first occurrence of a key wins.
+            if ! cbs_remote_probe_has "$key"; then
+                CBS_REMOTE_PROBE_ENTRIES+=("$key=$value")
             fi
         fi
     done <<<"$CBS_REMOTE_SSH_STDOUT"
@@ -71,7 +86,7 @@ cbs_remote_probe_parse() {
 
 # Resolves the commit that the remote repository is expected to be on.
 cbs_remote_resolve_expected_commit() {
-    local declared="${CBS_REMOTE_CFG[CBS_REMOTE_EXPECTED_COMMIT]}"
+    local declared="$(cbs_remote_cfg_get CBS_REMOTE_EXPECTED_COMMIT)"
     local local_repository
     local commit
 
@@ -80,7 +95,7 @@ cbs_remote_resolve_expected_commit() {
         return 0
     fi
 
-    local_repository="${CBS_REMOTE_RESOLVED[LOCAL_REPOSITORY]}"
+    local_repository="$(cbs_remote_resolved_get LOCAL_REPOSITORY)"
 
     printf 'CBS_REMOTE_LOCAL_REPOSITORY=%s\n' "$local_repository"
 
@@ -98,8 +113,8 @@ cbs_remote_resolve_expected_commit() {
 }
 
 cbs_remote_verify() {
-    local expected_origin="${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_ORIGIN]}"
-    local expected_branch="${CBS_REMOTE_CFG[CBS_REMOTE_EXPECTED_BRANCH]}"
+    local expected_origin="$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_ORIGIN)"
+    local expected_branch="$(cbs_remote_cfg_get CBS_REMOTE_EXPECTED_BRANCH)"
     local repository_state
     local observed_branch
     local observed_head
@@ -148,7 +163,7 @@ cbs_remote_verify() {
     cbs_remote_probe_parse
 
     if [[ "$CBS_REMOTE_SSH_RC" -ne 0 ]] ||
-        [[ "${CBS_REMOTE_PROBE[COMPLETE]:-}" != "YES" ]]
+        [[ "$(cbs_remote_probe_get COMPLETE)" != "YES" ]]
     then
         echo "CBS_REMOTE_CONNECTION=OK"
         cbs_remote_outcome \
@@ -160,8 +175,8 @@ cbs_remote_verify() {
 
     echo "CBS_REMOTE_CONNECTION=OK"
 
-    if [[ "${CBS_REMOTE_PROBE[GIT]:-}" != "AVAILABLE" ]]; then
-        echo "CBS_REMOTE_REMOTE_GIT=${CBS_REMOTE_PROBE[GIT]:-UNKNOWN}"
+    if [[ "$(cbs_remote_probe_get GIT)" != "AVAILABLE" ]]; then
+        echo "CBS_REMOTE_REMOTE_GIT=$(cbs_remote_probe_get GIT UNKNOWN)"
         cbs_remote_outcome \
             "$CBS_REMOTE_RESULT_BLOCKED" \
             "$CBS_REMOTE_REASON_REMOTE_GIT_UNAVAILABLE" \
@@ -170,7 +185,7 @@ cbs_remote_verify() {
     fi
 
     # --- Repository identity (Workspace / Repository contract vocabulary)
-    case "${CBS_REMOTE_PROBE[REPOSITORY]:-}" in
+    case "$(cbs_remote_probe_get REPOSITORY)" in
         MISSING)
             repository_state="$CBS_REPOSITORY_MISSING"
             ;;
@@ -178,7 +193,7 @@ cbs_remote_verify() {
             repository_state="$CBS_REPOSITORY_NOT_GIT"
             ;;
         READY)
-            observed_origin="${CBS_REMOTE_PROBE[ORIGIN]:-}"
+            observed_origin="$(cbs_remote_probe_get ORIGIN)"
 
             if [[ "$observed_origin" == "$expected_origin" ]]; then
                 repository_state="$CBS_REPOSITORY_READY"
@@ -195,9 +210,9 @@ cbs_remote_verify() {
     printf 'CBS_REMOTE_REPOSITORY_EXPECTED_ORIGIN=%s\n' \
         "$(cbs_remote_redact_url "$expected_origin")"
 
-    if [[ "${CBS_REMOTE_PROBE[REPOSITORY]:-}" == "READY" ]]; then
+    if [[ "$(cbs_remote_probe_get REPOSITORY)" == "READY" ]]; then
         printf 'CBS_REMOTE_REPOSITORY_OBSERVED_ORIGIN=%s\n' \
-            "$(cbs_remote_redact_url "${CBS_REMOTE_PROBE[ORIGIN]:-}")"
+            "$(cbs_remote_redact_url "$(cbs_remote_probe_get ORIGIN)")"
     fi
 
     if [[ "$repository_state" != "$CBS_REPOSITORY_READY" ]]; then
@@ -232,13 +247,13 @@ cbs_remote_verify() {
     fi
 
     # --- Branch
-    observed_branch="${CBS_REMOTE_PROBE[BRANCH]:-}"
+    observed_branch="$(cbs_remote_probe_get BRANCH)"
 
     printf 'CBS_REMOTE_EXPECTED_BRANCH=%s\n' "$expected_branch"
     printf 'CBS_REMOTE_OBSERVED_BRANCH=%s\n' "${observed_branch:-DETACHED}"
 
     # --- Commit
-    observed_head="${CBS_REMOTE_PROBE[HEAD]:-}"
+    observed_head="$(cbs_remote_probe_get HEAD)"
 
     if [[ -n "$observed_head" && ! "$observed_head" =~ $CBS_REMOTE_PATTERN_COMMIT ]]; then
         cbs_remote_outcome \
@@ -251,7 +266,7 @@ cbs_remote_verify() {
     if [[ "$observed_head" == "$CBS_REMOTE_EXPECTED_COMMIT_RESOLVED" ]]; then
         relation="$CBS_REMOTE_COMMIT_EQUAL"
     else
-        relation="${CBS_REMOTE_PROBE[COMMIT_RELATION]:-}"
+        relation="$(cbs_remote_probe_get COMMIT_RELATION)"
 
         if ! cbs_remote_commit_relation_is_valid "$relation" ||
             [[ "$relation" == "$CBS_REMOTE_COMMIT_EQUAL" ]]
@@ -267,8 +282,8 @@ cbs_remote_verify() {
     printf 'CBS_REMOTE_EXPECTED_COMMIT=%s\n' "$CBS_REMOTE_EXPECTED_COMMIT_RESOLVED"
     printf 'CBS_REMOTE_OBSERVED_COMMIT=%s\n' "${observed_head:-NONE}"
     printf 'CBS_REMOTE_COMMIT_RELATION=%s\n' "$relation"
-    printf 'CBS_REMOTE_WORKTREE_STATE=%s\n' "${CBS_REMOTE_PROBE[WORKTREE]:-$CBS_REPOSITORY_WORKTREE_UNKNOWN}"
-    printf 'CBS_REMOTE_ENTRYPOINT_STATE=%s\n' "${CBS_REMOTE_PROBE[ENTRYPOINT]:-UNKNOWN}"
+    printf 'CBS_REMOTE_WORKTREE_STATE=%s\n' "$(cbs_remote_probe_get WORKTREE "$CBS_REPOSITORY_WORKTREE_UNKNOWN")"
+    printf 'CBS_REMOTE_ENTRYPOINT_STATE=%s\n' "$(cbs_remote_probe_get ENTRYPOINT UNKNOWN)"
 
     if [[ "$observed_branch" != "$expected_branch" ]]; then
         cbs_remote_outcome \
@@ -287,7 +302,7 @@ cbs_remote_verify() {
     fi
 
     # --- Worktree (any tracked or untracked change blocks)
-    case "${CBS_REMOTE_PROBE[WORKTREE]:-}" in
+    case "$(cbs_remote_probe_get WORKTREE)" in
         "$CBS_REPOSITORY_WORKTREE_CLEAN")
             ;;
         "$CBS_REPOSITORY_WORKTREE_DIRTY")
@@ -307,7 +322,7 @@ cbs_remote_verify() {
     esac
 
     # --- CBS entrypoint
-    if [[ "${CBS_REMOTE_PROBE[ENTRYPOINT]:-}" != "PRESENT" ]]; then
+    if [[ "$(cbs_remote_probe_get ENTRYPOINT)" != "PRESENT" ]]; then
         cbs_remote_outcome \
             "$CBS_REMOTE_RESULT_BLOCKED" \
             "$CBS_REMOTE_REASON_ENTRYPOINT_UNAVAILABLE" \
@@ -396,7 +411,7 @@ cbs_remote_print_header() {
 }
 
 cbs_remote_print_manifest_identity() {
-    printf 'CBS_REMOTE_ID=%s\n' "${CBS_REMOTE_CFG[CBS_REMOTE_ID]}"
-    printf 'CBS_REMOTE_DESTINATION=%s\n' "${CBS_REMOTE_CFG[CBS_REMOTE_SSH_DESTINATION]}"
-    printf 'CBS_REMOTE_REPOSITORY_PATH=%s\n' "${CBS_REMOTE_CFG[CBS_REMOTE_REPOSITORY_PATH]}"
+    printf 'CBS_REMOTE_ID=%s\n' "$(cbs_remote_cfg_get CBS_REMOTE_ID)"
+    printf 'CBS_REMOTE_DESTINATION=%s\n' "$(cbs_remote_cfg_get CBS_REMOTE_SSH_DESTINATION)"
+    printf 'CBS_REMOTE_REPOSITORY_PATH=%s\n' "$(cbs_remote_cfg_get CBS_REMOTE_REPOSITORY_PATH)"
 }

@@ -2,8 +2,8 @@
 
 # CBS Remote Contract
 #
-# Constants, validation helpers and structured-result helpers only.
-# This file performs no SSH connection and no mutation.
+# Constants, validation helpers, Bash 3.2 compatible lookup and case helpers
+# and structured-result helpers only. This file performs no SSH connection and no mutation.
 
 if [[ "${CBS_REMOTE_CONTRACT_LOADED:-0}" == "1" ]]; then
     return 0 2>/dev/null || exit 0
@@ -95,7 +95,11 @@ readonly CBS_REMOTE_PATTERN_DESTINATION='^[A-Za-z0-9_][A-Za-z0-9._@-]{0,254}$'
 readonly CBS_REMOTE_PATTERN_ACTION_NAME='^[a-z][a-z0-9_]{0,39}$'
 readonly CBS_REMOTE_PATTERN_BRANCH='^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$'
 readonly CBS_REMOTE_PATTERN_COMMIT='^([0-9a-f]{40}|[0-9a-f]{64})$'
-readonly CBS_REMOTE_PATTERN_ORIGIN='^[A-Za-z0-9][A-Za-z0-9._~:/@+%-]{0,1023}$'
+# The origin length bound (1024) is checked separately from the character
+# set: a repetition count above 255 is not accepted by the BSD regular
+# expression library of macOS (RE_DUP_MAX).
+readonly CBS_REMOTE_PATTERN_ORIGIN='^[A-Za-z0-9][A-Za-z0-9._~:/@+%-]*$'
+readonly CBS_REMOTE_ORIGIN_MAX_LENGTH=1024
 readonly CBS_REMOTE_PATTERN_PATH='^[A-Za-z0-9._/+@ -]+$'
 readonly CBS_REMOTE_PATTERN_COMMAND_WORD='^[A-Za-z0-9._/+@:=%,-]+$'
 readonly CBS_REMOTE_PATTERN_PATH_LIST='^/[A-Za-z0-9._/+@-]*(:/[A-Za-z0-9._/+@-]*)*$'
@@ -164,7 +168,10 @@ cbs_remote_commit_relation_is_valid() {
 #   - "remote" (no recursion).
 #
 # Adding an entry is an explicit change to this list, together with a test.
-declare -gra CBS_REMOTE_COMMAND_ALLOW_LIST=(
+#
+# A plain assignment followed by readonly is global wherever this file is
+# sourced and is understood by Bash 3.2 (the global flag of declare is not).
+CBS_REMOTE_COMMAND_ALLOW_LIST=(
     "version"
     "status"
     "workstation check"
@@ -177,6 +184,7 @@ declare -gra CBS_REMOTE_COMMAND_ALLOW_LIST=(
     "platform resolve"
     "runtime android list"
 )
+readonly CBS_REMOTE_COMMAND_ALLOW_LIST
 
 # Arguments: up to the first three words of an action command.
 # Succeeds only when they begin with exactly one allow-list entry.
@@ -204,6 +212,111 @@ cbs_remote_command_prefix_is_allowed() {
     done
 
     return 1
+}
+
+# --- Portable helpers (Bash 3.2 and later) ----------------------------------
+#
+# Bash 3.2 has no associative array and no case conversion expansion. A keyed
+# store is therefore an indexed array of "KEY=VALUE" entries that is only read
+# through the functions below. A key is compared as a plain string: it is never
+# used as a variable name, an array subscript or shell code. A key never
+# contains "=".
+
+# Arguments: KEY [ENTRY...]
+# Succeeds when an entry carries the key.
+cbs_remote_entries_has() {
+    local wanted="$1"
+    local entry
+
+    shift
+
+    for entry in "$@"; do
+        if [[ "${entry%%=*}" == "$wanted" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Arguments: KEY DEFAULT [ENTRY...]
+# Prints the value of the first entry carrying the key, or DEFAULT when the key
+# is absent or its value is empty. Always succeeds.
+cbs_remote_entries_get() {
+    local wanted="$1"
+    local default="$2"
+    local entry
+    local value=""
+
+    shift 2
+
+    for entry in "$@"; do
+        if [[ "${entry%%=*}" == "$wanted" ]]; then
+            value="${entry#*=}"
+            break
+        fi
+    done
+
+    printf '%s' "${value:-$default}"
+}
+
+# Arguments: WORD [ITEM...]
+# Succeeds when WORD is exactly one of the items.
+cbs_remote_word_in_list() {
+    local wanted="$1"
+    local item
+
+    shift
+
+    for item in "$@"; do
+        if [[ "$item" == "$wanted" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# ASCII case conversion, independent of the locale (replaces the Bash 4 upper
+# and lower case parameter expansions). Pure Bash: no external command is
+# needed, so the set of tools required by this component does not change.
+# Arguments: FROM_ALPHABET TO_ALPHABET TEXT
+# Each character of TEXT found in FROM_ALPHABET is replaced by the character of
+# TO_ALPHABET at the same position; every other character is kept.
+cbs_remote_ascii_convert() {
+    local from="$1"
+    local to="$2"
+    local input="${3-}"
+    local output=""
+    local character
+    local head
+    local index
+
+    for ((index = 0; index < ${#input}; index++)); do
+        character="${input:index:1}"
+
+        # The test is a literal comparison: when it succeeds, the character is
+        # a letter of the alphabet and cannot act as a glob pattern below.
+        if [[ "$from" == *"$character"* ]]; then
+            head="${from%%$character*}"
+            character="${to:${#head}:1}"
+        fi
+
+        output="$output$character"
+    done
+
+    printf '%s' "$output"
+}
+
+# Argument: the text.
+cbs_remote_ascii_upper() {
+    cbs_remote_ascii_convert \
+        "abcdefghijklmnopqrstuvwxyz" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "${1-}"
+}
+
+cbs_remote_ascii_lower() {
+    cbs_remote_ascii_convert \
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "abcdefghijklmnopqrstuvwxyz" "${1-}"
 }
 
 # Emits the structured outcome. Arguments: RESULT REASON(optional) RC

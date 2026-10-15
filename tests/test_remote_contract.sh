@@ -64,11 +64,12 @@ codes=(
     "$CBS_RC_REMOTE_TRANSPORT_FAILURE"
 )
 
-declare -A seen=()
+# Codes already seen, as a space-delimited list (no associative array: Bash 3.2).
+seen=" "
 
 for code in "${codes[@]}"; do
-    [[ -z "${seen[$code]+x}" ]] || fail "RC_DUPLICATE_$code"
-    seen["$code"]=1
+    [[ "$seen" != *" $code "* ]] || fail "RC_DUPLICATE_$code"
+    seen="$seen$code "
 done
 
 for reused in \
@@ -79,7 +80,7 @@ for reused in \
     "$CBS_RC_REMOTE_USAGE" \
     0
 do
-    [[ -z "${seen[$reused]+x}" ]] || fail "RC_COLLISION_$reused"
+    [[ "$seen" != *" $reused "* ]] || fail "RC_COLLISION_$reused"
 done
 
 [[ "$CBS_RC_REMOTE_USAGE" -eq 64 ]] || fail "RC_USAGE"
@@ -227,6 +228,82 @@ ERROR_OUTPUT="$(cbs_remote_emit_result BLOCKED HOST_UNREACHABLE 2>&1 >/dev/null)
     fail "EMIT_ERROR_STREAM"
 
 echo "TEST_REMOTE_CONTRACT_EMIT=PASS"
+
+# --- Bash 3.2 compatible lookup and case helpers
+
+# Keyed entries: first match wins, defaults apply to absent and empty values,
+# keys are compared as plain strings (glob characters are not patterns).
+ENTRIES=("ALPHA=one" "BETA=" "GAMMA=a=b=c" "A*=glob" "ALPHA=shadowed")
+
+cbs_remote_entries_has ALPHA "${ENTRIES[@]}" || fail "ENTRIES_HAS_PRESENT"
+cbs_remote_entries_has BETA "${ENTRIES[@]}" || fail "ENTRIES_HAS_EMPTY_VALUE"
+
+if cbs_remote_entries_has DELTA "${ENTRIES[@]}"; then
+    fail "ENTRIES_HAS_ABSENT"
+fi
+
+if cbs_remote_entries_has "ALP" "${ENTRIES[@]}"; then
+    fail "ENTRIES_HAS_PREFIX_MATCHED"
+fi
+
+if cbs_remote_entries_has "A?" "${ENTRIES[@]}"; then
+    fail "ENTRIES_HAS_GLOB_MATCHED"
+fi
+
+if cbs_remote_entries_has ALPHA; then
+    fail "ENTRIES_HAS_EMPTY_STORE"
+fi
+
+[[ "$(cbs_remote_entries_get ALPHA "" "${ENTRIES[@]}")" == "one" ]] ||
+    fail "ENTRIES_GET_FIRST_WINS"
+[[ "$(cbs_remote_entries_get GAMMA "" "${ENTRIES[@]}")" == "a=b=c" ]] ||
+    fail "ENTRIES_GET_VALUE_WITH_EQUALS"
+[[ "$(cbs_remote_entries_get "A*" "" "${ENTRIES[@]}")" == "glob" ]] ||
+    fail "ENTRIES_GET_GLOB_KEY_IS_LITERAL"
+[[ "$(cbs_remote_entries_get BETA fallback "${ENTRIES[@]}")" == "fallback" ]] ||
+    fail "ENTRIES_GET_DEFAULT_ON_EMPTY"
+[[ "$(cbs_remote_entries_get DELTA fallback "${ENTRIES[@]}")" == "fallback" ]] ||
+    fail "ENTRIES_GET_DEFAULT_ON_ABSENT"
+[[ -z "$(cbs_remote_entries_get DELTA "")" ]] ||
+    fail "ENTRIES_GET_EMPTY_STORE"
+
+cbs_remote_word_in_list show_args show_version show_args || fail "WORD_IN_LIST_PRESENT"
+
+if cbs_remote_word_in_list show show_version show_args; then
+    fail "WORD_IN_LIST_PREFIX_MATCHED"
+fi
+
+if cbs_remote_word_in_list show_args; then
+    fail "WORD_IN_LIST_EMPTY"
+fi
+
+# ASCII case conversion does not depend on the locale (the Turkish locale, whose
+# dotless i breaks locale-aware conversions, is exercised when it is installed).
+LOCALE_NAMES=(C)
+
+if locale -a 2>/dev/null | grep -Fxq 'tr_TR.UTF-8'; then
+    LOCALE_NAMES+=(tr_TR.UTF-8)
+fi
+
+for locale_name in "${LOCALE_NAMES[@]}"; do
+    [[ "$(LC_ALL="$locale_name" cbs_remote_ascii_upper "show_exit42-iI")" == "SHOW_EXIT42-II" ]] ||
+        fail "ASCII_UPPER_$locale_name"
+    [[ "$(LC_ALL="$locale_name" cbs_remote_ascii_lower "SHOW_EXIT42-iI")" == "show_exit42-ii" ]] ||
+        fail "ASCII_LOWER_$locale_name"
+done
+
+[[ -z "$(cbs_remote_ascii_upper "")" && -z "$(cbs_remote_ascii_lower "")" ]] ||
+    fail "ASCII_CASE_EMPTY"
+
+# The allow-list stays read-only once the contract is loaded.
+if (CBS_REMOTE_COMMAND_ALLOW_LIST+=("platform start")) 2>/dev/null; then
+    fail "ALLOW_LIST_IS_WRITABLE"
+fi
+
+[[ "${#CBS_REMOTE_COMMAND_ALLOW_LIST[@]}" -eq "${#EXPECTED_ALLOW_LIST[@]}" ]] ||
+    fail "ALLOW_LIST_WAS_MODIFIED"
+
+echo "TEST_REMOTE_CONTRACT_PORTABLE_HELPERS=PASS"
 
 # --- source idempotence
 source "$ROOT/cbs/remote/contract.sh"

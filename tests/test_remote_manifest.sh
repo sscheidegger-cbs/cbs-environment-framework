@@ -86,9 +86,9 @@ OUT="$(
         source "$1/cbs/remote/remote_manifest.sh"
         cbs_remote_manifest_load "$2"
         printf "%s\n" "${CBS_REMOTE_ACTIONS[*]}"
-        printf "%s\n" "${CBS_REMOTE_RESOLVED[ACTION_show_args]}"
-        printf "%s\n" "${CBS_REMOTE_RESOLVED[ENTRYPOINT]}"
-        printf "%s\n" "${CBS_REMOTE_RESOLVED[LOCAL_REPOSITORY]}"
+        printf "%s\n" "$(cbs_remote_resolved_get ACTION_show_args)"
+        printf "%s\n" "$(cbs_remote_resolved_get ENTRYPOINT)"
+        printf "%s\n" "$(cbs_remote_resolved_get LOCAL_REPOSITORY)"
     ' load "$ROOT" "$MANIFEST"
 )"
 
@@ -117,7 +117,7 @@ OUT="$(
         set -Eeuo pipefail
         source "$1/cbs/remote/remote_manifest.sh"
         cbs_remote_manifest_load "$2"
-        printf "%s\n" "${CBS_REMOTE_RESOLVED[LOCAL_REPOSITORY]}"
+        printf "%s\n" "$(cbs_remote_resolved_get LOCAL_REPOSITORY)"
     ' load "$ROOT" "$MANIFEST"
 )"
 
@@ -165,23 +165,24 @@ expect_invalid "INDENTED_LINE" "INVALID_LINE"
 
 remote_test_scenario
 remote_test_write_manifest "$MANIFEST"
-sed -i '/^CBS_REMOTE_EXPECTED_BRANCH=/d' "$MANIFEST"
+remote_test_sed_inplace '/^CBS_REMOTE_EXPECTED_BRANCH=/d' "$MANIFEST"
 expect_invalid "MISSING_BRANCH" "MISSING_KEY" "CBS_REMOTE_EXPECTED_BRANCH"
 
 remote_test_scenario
 remote_test_write_manifest "$MANIFEST"
-sed -i '/^CBS_REMOTE_ALLOWED_ACTIONS=/d' "$MANIFEST"
+remote_test_sed_inplace '/^CBS_REMOTE_ALLOWED_ACTIONS=/d' "$MANIFEST"
 expect_invalid "MISSING_ALLOWED_ACTIONS" "MISSING_KEY" "CBS_REMOTE_ALLOWED_ACTIONS"
 
 remote_test_scenario
 remote_test_write_manifest "$MANIFEST"
-sed -i 's/^CBS_REMOTE_MANIFEST_VERSION=1/CBS_REMOTE_MANIFEST_VERSION=2/' "$MANIFEST"
+remote_test_sed_inplace 's/^CBS_REMOTE_MANIFEST_VERSION=1/CBS_REMOTE_MANIFEST_VERSION=2/' "$MANIFEST"
 expect_invalid "UNSUPPORTED_VERSION" "UNSUPPORTED_VERSION"
 
 # CRLF line endings are not silently accepted.
 remote_test_scenario
 remote_test_write_manifest "$MANIFEST"
-sed -i 's/$/\r/' "$MANIFEST"
+# A literal carriage return: "\r" in a replacement is not portable to BSD sed.
+remote_test_sed_inplace "s/\$/$(printf '\r')/" "$MANIFEST"
 load "$MANIFEST"
 [[ "$RC" -ne 0 ]] || remote_test_fail "CRLF_ACCEPTED"
 
@@ -196,7 +197,7 @@ reject_value() {
 
     remote_test_scenario
     remote_test_write_manifest "$MANIFEST"
-    sed -i "/^${key}=/d" "$MANIFEST"
+    remote_test_sed_inplace "/^${key}=/d" "$MANIFEST"
     printf '%s=%s\n' "$key" "$value" >> "$MANIFEST"
     expect_invalid "$label" "INVALID_VALUE" "$key"
 }
@@ -254,7 +255,7 @@ expect_invalid "ALLOWED_DUPLICATE" "DUPLICATE_ACTION"
 remote_test_scenario
 M_COMMIT="LOCAL_HEAD"
 remote_test_write_manifest "$MANIFEST"
-sed -i '/^CBS_REMOTE_LOCAL_REPOSITORY_PATH=/d' "$MANIFEST"
+remote_test_sed_inplace '/^CBS_REMOTE_LOCAL_REPOSITORY_PATH=/d' "$MANIFEST"
 expect_invalid "LOCAL_HEAD_WITHOUT_LOCAL_PATH" "MISSING_KEY" "CBS_REMOTE_LOCAL_REPOSITORY_PATH"
 
 remote_test_scenario
@@ -298,6 +299,22 @@ M_ORIGIN="https://example.invalid/group/project.git"
 remote_test_write_manifest "$MANIFEST"
 expect_valid "ORIGIN_HTTPS_WITHOUT_USERINFO"
 
+# The origin length bound (1024 characters) holds, whatever the regular
+# expression engine and its repetition limit.
+ORIGIN_PREFIX="https://example.invalid/"
+ORIGIN_PADDING="$(printf '%1000s' '' | tr ' ' 'a')"
+
+remote_test_scenario
+M_ORIGIN="${ORIGIN_PREFIX}${ORIGIN_PADDING}"
+[[ "${#M_ORIGIN}" -eq 1024 ]] || remote_test_fail "ORIGIN_FIXTURE_LENGTH_${#M_ORIGIN}"
+remote_test_write_manifest "$MANIFEST"
+expect_valid "ORIGIN_MAX_LENGTH"
+
+remote_test_scenario
+M_ORIGIN="${ORIGIN_PREFIX}${ORIGIN_PADDING}a"
+remote_test_write_manifest "$MANIFEST"
+expect_invalid "ORIGIN_TOO_LONG" "INVALID_VALUE" "CBS_REMOTE_REPOSITORY_ORIGIN"
+
 echo "TEST_REMOTE_MANIFEST_SECRET_REFUSAL=PASS"
 
 # --- actions
@@ -330,7 +347,7 @@ do
     M_ALLOWED="bad_action"
     M_EXTRA="CBS_REMOTE_ACTION_BAD_ACTION_COMMAND=$command"
     remote_test_write_manifest "$MANIFEST"
-    sed -i '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
+    remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
     expect_invalid "COMMAND_NOT_ALLOWED_$command" "COMMAND_NOT_ALLOWED" "CBS_REMOTE_ACTION_BAD_ACTION_COMMAND"
 done
 
@@ -352,7 +369,7 @@ do
     M_ALLOWED="ok_action"
     M_EXTRA="CBS_REMOTE_ACTION_OK_ACTION_COMMAND=$command"
     remote_test_write_manifest "$MANIFEST"
-    sed -i '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
+    remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
     expect_valid "COMMAND_ALLOWED_$command"
 done
 
@@ -378,7 +395,7 @@ do
     M_ALLOWED="bad_action"
     M_EXTRA="CBS_REMOTE_ACTION_BAD_ACTION_COMMAND=$command"
     remote_test_write_manifest "$MANIFEST"
-    sed -i '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
+    remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
     load "$MANIFEST"
     [[ "$RC" -ne 0 ]] ||
         remote_test_fail "COMMAND_INJECTION_ACCEPTED:$command"
@@ -392,7 +409,7 @@ expect_invalid "ACTION_COMMAND_FOR_UNDECLARED_ACTION" "ACTION_NOT_DECLARED"
 remote_test_scenario
 M_ALLOWED="show_version missing_action"
 remote_test_write_manifest "$MANIFEST"
-sed -i '/^CBS_REMOTE_ACTION_SHOW_\(ARGS\|FAIL\|EXIT42\)_COMMAND=/d' "$MANIFEST"
+remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_(ARGS|FAIL|EXIT42)_COMMAND=/d' "$MANIFEST"
 expect_invalid "DECLARED_ACTION_WITHOUT_COMMAND" "ACTION_COMMAND_MISSING" "CBS_REMOTE_ACTION_MISSING_ACTION_COMMAND"
 
 echo "TEST_REMOTE_MANIFEST_ACTIONS=PASS"

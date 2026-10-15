@@ -98,7 +98,7 @@ remote_test_scenario
 M_ALLOWED="meta"
 M_EXTRA='CBS_REMOTE_ACTION_META_COMMAND=version %s%d =x,y:z @home +plus a%20b'
 remote_test_write_manifest "$MANIFEST"
-sed -i '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
+remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_/d' "$MANIFEST"
 remote_test_run "$CBS" remote run "$MANIFEST" meta
 remote_test_expect_rc 0 "META"
 remote_test_expect_out "FIXTURE_CBS_ARGC=6" "META"
@@ -194,7 +194,7 @@ fi
 remote_test_scenario
 M_ALLOWED="show_version"
 remote_test_write_manifest "$MANIFEST"
-sed -i '/^CBS_REMOTE_ACTION_SHOW_\(ARGS\|FAIL\|EXIT42\)_COMMAND=/d' "$MANIFEST"
+remote_test_sed_inplace '/^CBS_REMOTE_ACTION_SHOW_(ARGS|FAIL|EXIT42)_COMMAND=/d' "$MANIFEST"
 remote_test_run "$CBS" remote run "$MANIFEST" show_exit42
 expect_blocked "ACTION_NOT_IN_ALLOW_LIST" "ACTION_NOT_ALLOWED" "$CBS_RC_REMOTE_ACTION_NOT_ALLOWED"
 remote_test_expect_ssh_count 0 "ACTION_NOT_IN_ALLOW_LIST"

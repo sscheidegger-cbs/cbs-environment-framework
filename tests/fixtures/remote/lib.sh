@@ -36,6 +36,37 @@ remote_test_git() {
     "$REMOTE_TEST_REAL_GIT" "$@"
 }
 
+# In-place edit of a file, identical with GNU sed and BSD sed (macOS), whose
+# "-i" options are incompatible. The edit goes through a temporary file created
+# next to the target; the target is only rewritten when sed succeeded, and the
+# temporary file is always removed.
+#
+# Arguments: SED_EXPRESSION FILE
+# The expression is an extended regular expression script (sed -E). It must be
+# written with the subset common to GNU and BSD sed: no "\|", "\r" or "\n"
+# escape (pass a literal carriage return when one is needed).
+remote_test_sed_inplace() {
+    local expression="${1:?remote_test_sed_inplace: expression required}"
+    local file="${2:?remote_test_sed_inplace: file required}"
+    local temporary
+    local rc=0
+
+    [[ -f "$file" ]] || return 1
+
+    temporary="$(mktemp "${file}.sedtmp.XXXXXX")" || return 1
+
+    if sed -E -e "$expression" "$file" >"$temporary"; then
+        # Rewriting through cat keeps the mode and the inode of the target.
+        cat "$temporary" >"$file" || rc=$?
+    else
+        rc=$?
+    fi
+
+    rm -f "$temporary"
+
+    return "$rc"
+}
+
 # Creates, under the current scenario directory $SCN:
 #   local                              "local" repository (source of LOCAL_HEAD)
 #   remote fs/work repo                "remote" repository (path with a space)
