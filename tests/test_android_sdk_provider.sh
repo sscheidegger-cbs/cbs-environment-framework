@@ -16,6 +16,15 @@ printf '%s\n' '--- PROVIDER PRESENCE ---'
 [[ -x "$PROVIDER" ]] ||
     fail "PROVIDER_MISSING"
 
+# The android-sdk 36 profile is Linux-bound. On macOS the provider reports
+# NOT_APPLICABLE; that behavior is qualified by
+# tests/test_flutter_stack_macos_compat.sh, which pins the host explicitly.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo "TEST_ANDROID_SDK_PROVIDER_SKIPPED=HOST_DARWIN_PROFILE_LINUX_BOUND"
+    echo "TEST_ANDROID_SDK_PROVIDER_RESULT=SKIPPED"
+    exit 0
+fi
+
 printf '%s\n' '--- PROFILE CONTRACT ---'
 
 TMP="$(mktemp -d)"

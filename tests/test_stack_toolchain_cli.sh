@@ -59,20 +59,22 @@ grep -Fq \
     <<<"$OUTPUT" ||
     fail "XCODE_ID"
 
+# Exactly one host-bound toolchain is NOT_APPLICABLE on each qualified host:
+# Xcode on Linux, android-sdk on macOS.
 grep -Fq \
     'CBS_STACK_MANAGED_TOOLCHAIN_INSTALLATION_STATE=NOT_APPLICABLE' \
     <<<"$OUTPUT" ||
-    fail "XCODE_NOT_APPLICABLE"
+    fail "HOST_BOUND_NOT_APPLICABLE"
 
 grep -Fq \
     'CBS_STACK_MANAGED_TOOLCHAIN_DECISION=BLOCK' \
     <<<"$OUTPUT" ||
-    fail "XCODE_DECISION"
+    fail "HOST_BOUND_DECISION"
 
 grep -Fq \
     'CBS_STACK_MANAGED_TOOLCHAIN_MUTATION=NONE' \
     <<<"$OUTPUT" ||
-    fail "XCODE_MUTATION"
+    fail "HOST_BOUND_MUTATION"
 
 grep -Fq \
     'CBS_STACK_TOOLCHAIN_REQUIRED_COUNT=3' \

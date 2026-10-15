@@ -42,7 +42,21 @@ readonly CBS_ANDROID_SYSTEM_IMAGE_PACKAGE="system-images;android-36;google_apis_
 readonly CBS_ANDROID_CMDLINE_TOOLS_URL_DEFAULT="https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip"
 readonly CBS_ANDROID_CMDLINE_TOOLS_SHA1_DEFAULT="e025545c62a8e64c7559119566a569fb1dec5f60"
 
+cbs_android_sdk_host_is_macos() {
+    [[ "$(uname -s)" == "Darwin" ]]
+}
+
 cbs_android_sdk_detect() {
+    # The android-sdk 36 profile is Linux-bound (Linux command-line tools,
+    # x86_64 system image). On macOS it is declared NOT_APPLICABLE so a
+    # Stack that lists it as REQUIRED can still resolve for iOS.
+    if cbs_android_sdk_host_is_macos; then
+        echo "CBS_TOOLCHAIN_PROVIDER_INSTALLATION_STATE=NOT_APPLICABLE"
+        echo "CBS_TOOLCHAIN_PROVIDER_RESOLVED_PATH=$resolved_path"
+        echo "CBS_TOOLCHAIN_PROVIDER_REASON=HOST_PLATFORM_UNSUPPORTED"
+        return 0
+    fi
+
     local sdkmanager="$resolved_path/cmdline-tools/23.0/bin/sdkmanager"
     local adb="$resolved_path/platform-tools/adb"
     local aapt2="$resolved_path/build-tools/36.0.0/aapt2"
@@ -97,6 +111,10 @@ cbs_android_sdk_property_value() {
 }
 
 cbs_android_sdk_verify() {
+    if cbs_android_sdk_host_is_macos; then
+        fail_provider "HOST_PLATFORM_UNSUPPORTED"
+    fi
+
     local sdkmanager="$resolved_path/cmdline-tools/23.0/bin/sdkmanager"
     local adb="$resolved_path/platform-tools/adb"
     local aapt2="$resolved_path/build-tools/36.0.0/aapt2"
@@ -231,6 +249,10 @@ cbs_android_sdk_verify() {
 }
 
 cbs_android_sdk_ensure() {
+    if cbs_android_sdk_host_is_macos; then
+        fail_provider "HOST_PLATFORM_UNSUPPORTED"
+    fi
+
     command -v unzip >/dev/null 2>&1 ||
         fail_provider "UNZIP_MISSING"
 

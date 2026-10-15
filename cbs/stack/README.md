@@ -357,3 +357,31 @@ lifecycle with Flutter as the first real provider.
 It does not qualify automatic reconciliation, generic project dependency
 installation, runtime component lifecycle, or multi-stack genericity across
 two heterogeneous real consumers.
+
+## D04b-A Flutter Stack on macOS/iOS
+
+The Flutter reference Stack keeps `ANDROID_SDK` declared as `REQUIRED`.
+The manifest is unchanged.
+
+The `android-sdk` provider profile 36 is Linux-bound. On a Darwin host its
+`DETECT` operation reports:
+
+```text
+CBS_TOOLCHAIN_PROVIDER_INSTALLATION_STATE=NOT_APPLICABLE
+CBS_TOOLCHAIN_PROVIDER_REASON=HOST_PLATFORM_UNSUPPORTED
+```
+
+`ENSURE` and `VERIFY` refuse with `HOST_PLATFORM_UNSUPPORTED`.
+
+The generic `NOT_APPLICABLE` handling of the Toolchain Manager and the Stack
+evaluator, manager and environment layers is reused as is, exactly as for
+Xcode on Linux. On macOS the Stack therefore resolves with Flutter and Xcode
+and without Android SDK exports; on Linux the Android SDK remains required.
+
+Android SDK is never installed on macOS by this behavior.
+
+Contract tests:
+
+```text
+tests/test_flutter_stack_macos_compat.sh
+```
