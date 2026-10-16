@@ -1,6 +1,7 @@
 import 'catalog_entry.dart';
 import 'sections/application_states_section.dart';
 import 'sections/buttons_section.dart';
+import 'sections/content_card_section.dart';
 import 'sections/feedback_section.dart';
 import 'sections/loading_section.dart';
 import 'sections/retry_message_section.dart';
@@ -12,6 +13,11 @@ import 'sections/state_panel_section.dart';
 /// To add a section: create its widget under `sections/`, then append
 /// one [CatalogEntry] here.
 final List<CatalogEntry> catalogEntries = <CatalogEntry>[
+  CatalogEntry(
+    id: 'content-card',
+    title: 'Content card',
+    builder: (_) => const ContentCardSection(),
+  ),
   CatalogEntry(
     id: 'buttons',
     title: 'Buttons',
