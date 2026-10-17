@@ -142,6 +142,7 @@ void main() {
         'application-states',
         'content-card',
         'media-frame',
+        'adaptive-collection',
       ]);
       expect(ids.toSet(), hasLength(ids.length));
     });

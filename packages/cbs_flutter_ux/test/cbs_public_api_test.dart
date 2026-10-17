@@ -93,4 +93,30 @@ void main() {
     expect(const CbsMediaFrame(child: SizedBox()).borderRadius, isNull);
     expect(const CbsMediaFrame(child: SizedBox()).semanticLabel, isNull);
   });
+
+  test('exposes the D05 VP-03 addition', () {
+    // CbsCollectionLayout: list and grid, in this order.
+    expect(CbsCollectionLayout.values, [
+      CbsCollectionLayout.list,
+      CbsCollectionLayout.grid,
+    ]);
+
+    // CbsAdaptiveCollection: children required; layout, spacing,
+    // runSpacing and minItemWidth optional.
+    const CbsAdaptiveCollection(children: [SizedBox()]);
+    const CbsAdaptiveCollection(
+      key: ValueKey('collection'),
+      layout: CbsCollectionLayout.grid,
+      spacing: 8,
+      runSpacing: 16,
+      minItemWidth: 120,
+      children: [SizedBox(), SizedBox()],
+    );
+    const collection = CbsAdaptiveCollection(children: []);
+    expect(collection.layout, CbsCollectionLayout.list);
+    expect(collection.spacing, 12);
+    expect(collection.runSpacing, 12);
+    expect(collection.minItemWidth, 240);
+    expect(collection, isA<StatelessWidget>());
+  });
 }

@@ -6,6 +6,7 @@ library;
 export 'src/components/primitives/cbs_button.dart';
 export 'src/components/primitives/cbs_feedback_message.dart';
 export 'src/components/primitives/cbs_loading_indicator.dart';
+export 'src/components/visual_parts/cbs_adaptive_collection.dart';
 export 'src/components/visual_parts/cbs_content_card.dart';
 export 'src/components/visual_parts/cbs_media_frame.dart';
 export 'src/components/visual_parts/cbs_section_heading.dart';

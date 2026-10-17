@@ -1,4 +1,5 @@
 import 'catalog_entry.dart';
+import 'sections/adaptive_collection_section.dart';
 import 'sections/application_states_section.dart';
 import 'sections/buttons_section.dart';
 import 'sections/content_card_section.dart';
@@ -58,5 +59,10 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'media-frame',
     title: 'Media frame',
     builder: (_) => const MediaFrameSection(),
+  ),
+  CatalogEntry(
+    id: 'adaptive-collection',
+    title: 'Adaptive collection',
+    builder: (_) => const AdaptiveCollectionSection(),
   ),
 ];

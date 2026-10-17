@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show Tristate;
 
 import 'package:cbs_flutter_ux/cbs_flutter_ux.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:cbs_flutter_ux_example/catalog/catalog_keys.dart';
 import 'package:cbs_flutter_ux_example/catalog/catalog_scenario.dart';
+import 'package:cbs_flutter_ux_example/catalog/sections/adaptive_collection_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/buttons_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/feedback_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/media_frame_section.dart';
@@ -50,7 +52,21 @@ const _demoIds = <String>[
   'media-1-1',
   'media-custom',
   'media-placeholder',
+  'collection-list',
+  'collection-grid',
+  'collection-cards',
+  'collection-media',
+  'collection-narrow',
 ];
+
+/// Columns of the adaptive grid (default `minItemWidth` 240 and `spacing`
+/// 12) at each simulated width.
+const _collectionColumns = <CatalogWidth, int>{
+  CatalogWidth.w320: 1,
+  CatalogWidth.w600: 2,
+  CatalogWidth.w840: 3,
+  CatalogWidth.w1280: 5,
+};
 
 /// Scenario of the "narrow screen, large text" worst case.
 const _narrowLargeText = CatalogScenario(textScale: CatalogTextScale.x2);
@@ -917,6 +933,331 @@ void main() {
             .colorScheme
             .surfaceContainerHighest,
       );
+    });
+  });
+
+  group('CbsAdaptiveCollection', () {
+    Finder collection(String demoId) =>
+        inDemo(demoId, find.byType(CbsAdaptiveCollection));
+
+    CbsAdaptiveCollection widgetOf(WidgetTester tester, String demoId) =>
+        tester.widget<CbsAdaptiveCollection>(collection(demoId));
+
+    Finder cards(String demoId) => inDemo(demoId, find.byType(CbsContentCard));
+
+    /// Title of [card]: tapping it activates the whole card.
+    Finder cardTitle(Finder card) => find.descendant(
+      of: card,
+      matching: find.text(AdaptiveCollectionSection.cardTitle),
+    );
+
+    /// Texts of the tiles of [demoId], in the order of the children.
+    List<Finder> tiles(String demoId, String prefix, int count) => [
+      for (var i = 1; i <= count; i++)
+        _text(demoId, AdaptiveCollectionSection.tileText(prefix, i)),
+    ];
+
+    /// Number of finders laid out on the same row as the first one.
+    int firstRow(WidgetTester tester, List<Finder> finders) {
+      final firstTop = tester.getTopLeft(finders.first).dy;
+      return finders
+          .where((f) => (tester.getTopLeft(f).dy - firstTop).abs() < 0.001)
+          .length;
+    }
+
+    double cell(CatalogWidth width) {
+      final columns = _collectionColumns[width]!;
+      return (width.logicalPixels - 12 * (columns - 1)) / columns;
+    }
+
+    testWidgets('is shown in its section, once per variant', (tester) async {
+      await _pump(tester);
+
+      expect(
+        inSection('adaptive-collection', find.byType(CbsAdaptiveCollection)),
+        findsNWidgets(5),
+      );
+      for (final id in [
+        'collection-list',
+        'collection-grid',
+        'collection-cards',
+        'collection-media',
+        'collection-narrow',
+      ]) {
+        expect(collection(id), findsOneWidget, reason: id);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shows the list and grid layouts with their children', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      expect(
+        widgetOf(tester, 'collection-list').layout,
+        CbsCollectionLayout.list,
+      );
+      expect(
+        widgetOf(tester, 'collection-list').children,
+        hasLength(AdaptiveCollectionSection.listCount),
+      );
+      for (final (id, count) in [
+        ('collection-grid', AdaptiveCollectionSection.gridCount),
+        ('collection-cards', AdaptiveCollectionSection.cardCount),
+        ('collection-media', AdaptiveCollectionSection.mediaCount),
+        ('collection-narrow', AdaptiveCollectionSection.narrowCount),
+      ]) {
+        expect(
+          widgetOf(tester, id).layout,
+          CbsCollectionLayout.grid,
+          reason: id,
+        );
+        expect(widgetOf(tester, id).children, hasLength(count), reason: id);
+      }
+
+      for (final finder in [
+        ...tiles(
+          'collection-list',
+          AdaptiveCollectionSection.listPrefix,
+          AdaptiveCollectionSection.listCount,
+        ),
+        ...tiles(
+          'collection-grid',
+          AdaptiveCollectionSection.gridPrefix,
+          AdaptiveCollectionSection.gridCount,
+        ),
+      ]) {
+        expect(finder, findsOneWidget);
+      }
+    });
+
+    testWidgets('composes CbsContentCard and CbsMediaFrame', (tester) async {
+      await _pump(tester);
+
+      expect(
+        cards('collection-cards'),
+        findsNWidgets(AdaptiveCollectionSection.cardCount),
+      );
+      expect(
+        cards('collection-media'),
+        findsNWidgets(AdaptiveCollectionSection.mediaCount),
+      );
+      expect(
+        inDemo('collection-media', find.byType(CbsMediaFrame)),
+        findsNWidgets(AdaptiveCollectionSection.mediaCount),
+      );
+      expect(
+        cards('collection-narrow'),
+        findsNWidgets(AdaptiveCollectionSection.narrowCount),
+      );
+      expect(
+        inDemo('collection-narrow', find.byType(CbsMediaFrame)),
+        findsNWidgets(AdaptiveCollectionSection.narrowCount),
+      );
+    });
+
+    for (final width in CatalogWidth.values) {
+      testWidgets('the list stacks the tiles over the full width at '
+          '${width.label}', (tester) async {
+        await _pump(tester, CatalogScenario(width: width));
+
+        final texts = tiles(
+          'collection-list',
+          AdaptiveCollectionSection.listPrefix,
+          AdaptiveCollectionSection.listCount,
+        );
+        expect(
+          _size(tester, collection('collection-list')).width,
+          width.logicalPixels,
+        );
+        expect(firstRow(tester, texts), 1);
+        var previousTop = double.negativeInfinity;
+        for (final text in texts) {
+          final top = tester.getTopLeft(text).dy;
+          expect(top, greaterThan(previousTop));
+          previousTop = top;
+        }
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the grid adapts its columns at ${width.label}', (
+        tester,
+      ) async {
+        await _pump(tester, CatalogScenario(width: width));
+
+        final columns = _collectionColumns[width]!;
+        final texts = tiles(
+          'collection-grid',
+          AdaptiveCollectionSection.gridPrefix,
+          AdaptiveCollectionSection.gridCount,
+        );
+        expect(
+          _size(tester, collection('collection-grid')).width,
+          width.logicalPixels,
+        );
+        expect(firstRow(tester, texts), columns);
+
+        // The cards of the grids follow the same columns; the first row
+        // cannot hold more cards than the grid has.
+        for (final id in ['collection-cards', 'collection-media']) {
+          final list = cards(id);
+          expect(
+            _size(tester, list.first).width,
+            closeTo(cell(width), 0.001),
+            reason: id,
+          );
+          expect(
+            firstRow(tester, [
+              for (var i = 0; i < AdaptiveCollectionSection.cardCount; i++)
+                list.at(i),
+            ]),
+            math.min(columns, AdaptiveCollectionSection.cardCount),
+            reason: id,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the narrow parent gives a single column at '
+          '${width.label}', (tester) async {
+        await _pump(tester, CatalogScenario(width: width));
+
+        expect(
+          _size(tester, collection('collection-narrow')).width,
+          AdaptiveCollectionSection.narrowWidth,
+        );
+        final list = cards('collection-narrow');
+        var previousTop = double.negativeInfinity;
+        for (var i = 0; i < AdaptiveCollectionSection.narrowCount; i++) {
+          expect(
+            _size(tester, list.at(i)).width,
+            AdaptiveCollectionSection.narrowWidth,
+          );
+          final top = tester.getTopLeft(list.at(i)).dy;
+          expect(top, greaterThan(previousTop));
+          previousTop = top;
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('the cards react to taps and to their action', (tester) async {
+      await _pump(tester, const CatalogScenario(width: CatalogWidth.w1280));
+      expect(
+        counterText(tester, 'collection-cards'),
+        'Collection card taps: 0',
+      );
+      expect(
+        counterText(tester, 'collection-action'),
+        'Collection action presses: 0',
+      );
+
+      final list = cards('collection-cards');
+      await tapVisible(tester, cardTitle(list.at(0)));
+      await tapVisible(tester, cardTitle(list.at(2)));
+
+      expect(
+        counterText(tester, 'collection-cards'),
+        'Collection card taps: 2',
+      );
+      expect(
+        counterText(tester, 'collection-action'),
+        'Collection action presses: 0',
+      );
+
+      // The action is independent from the card.
+      await tapVisible(
+        tester,
+        inDemo('collection-cards', find.byType(TextButton)).at(1),
+      );
+
+      expect(
+        counterText(tester, 'collection-cards'),
+        'Collection card taps: 2',
+      );
+      expect(
+        counterText(tester, 'collection-action'),
+        'Collection action presses: 1',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the counters survive scenario changes', (tester) async {
+      await _pump(tester);
+      await tapVisible(tester, cardTitle(cards('collection-cards').at(1)));
+
+      await selectOption(tester, CatalogKeys.widthOption(CatalogWidth.w840));
+      await selectOption(
+        tester,
+        CatalogKeys.designOption(CatalogDesign.branded),
+      );
+
+      expect(
+        counterText(tester, 'collection-cards'),
+        'Collection card taps: 1',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('exposes the semantic labels of the media', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _pump(tester);
+
+      for (var i = 1; i <= AdaptiveCollectionSection.mediaCount; i++) {
+        expect(
+          find.bySemanticsLabel(
+            RegExp(RegExp.escape(AdaptiveCollectionSection.mediaLabel(i))),
+          ),
+          findsOneWidget,
+          reason: 'media $i',
+        );
+      }
+      handle.dispose();
+    });
+
+    testWidgets('does not overflow at 320 px, text x2', (tester) async {
+      await _pump(tester, _narrowLargeText);
+
+      expect(tester.takeException(), isNull);
+      for (final id in [
+        'collection-list',
+        'collection-grid',
+        'collection-cards',
+        'collection-media',
+      ]) {
+        expect(_size(tester, collection(id)).width, 320, reason: id);
+      }
+      expect(
+        _size(tester, collection('collection-narrow')).width,
+        AdaptiveCollectionSection.narrowWidth,
+      );
+    });
+
+    testWidgets('follows the effective theme in dark Branded', (tester) async {
+      await _pump(
+        tester,
+        const CatalogScenario(
+          design: CatalogDesign.branded,
+          appearance: CatalogAppearance.dark,
+        ),
+      );
+
+      final scheme = CbsTheme.branded(
+        primaryColor: CatalogScenario.brandedPrimaryColor,
+        buttonRadius: CbsRadius.lg,
+        brightness: Brightness.dark,
+      ).colorScheme;
+      final card = tester.widget<Material>(
+        find
+            .descendant(
+              of: cards('collection-cards').first,
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(card.color, scheme.surfaceContainerLow);
+      expect(tester.takeException(), isNull);
     });
   });
 
