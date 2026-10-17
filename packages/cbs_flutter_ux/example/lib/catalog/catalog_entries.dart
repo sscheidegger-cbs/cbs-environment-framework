@@ -1,6 +1,7 @@
 import 'catalog_entry.dart';
 import 'sections/application_states_section.dart';
 import 'sections/buttons_section.dart';
+import 'sections/content_card_section.dart';
 import 'sections/feedback_section.dart';
 import 'sections/loading_section.dart';
 import 'sections/retry_message_section.dart';
@@ -46,5 +47,10 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'application-states',
     title: 'Application states',
     builder: (_) => const ApplicationStatesSection(),
+  ),
+  CatalogEntry(
+    id: 'content-card',
+    title: 'Content card',
+    builder: (_) => const ContentCardSection(),
   ),
 ];

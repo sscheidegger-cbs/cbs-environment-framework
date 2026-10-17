@@ -140,6 +140,7 @@ void main() {
         'retry-message',
         'section-heading',
         'application-states',
+        'content-card',
       ]);
       expect(ids.toSet(), hasLength(ids.length));
     });

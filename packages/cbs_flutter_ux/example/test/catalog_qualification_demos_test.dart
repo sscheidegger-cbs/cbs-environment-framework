@@ -775,7 +775,7 @@ void main() {
   });
 
   group('catalog completeness', () {
-    testWidgets('keeps the seven sections and the six widgets', (tester) async {
+    testWidgets('keeps the eight sections and the six widgets', (tester) async {
       await _pump(tester);
 
       expect(catalogEntries.map((e) => e.id), [
@@ -786,6 +786,7 @@ void main() {
         'retry-message',
         'section-heading',
         'application-states',
+        'content-card',
       ]);
       expect(inSection('buttons', find.byType(CbsButton)), findsWidgets);
       expect(
