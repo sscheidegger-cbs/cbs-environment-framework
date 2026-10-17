@@ -119,4 +119,23 @@ void main() {
     expect(collection.minItemWidth, 240);
     expect(collection, isA<StatelessWidget>());
   });
+
+  test('exposes the D05 VP-04 addition', () {
+    // CbsContentSection: title and child required; subtitle and action
+    // optional.
+    const CbsContentSection(title: 'Title', child: SizedBox());
+    const CbsContentSection(
+      key: ValueKey('section'),
+      title: 'Title',
+      subtitle: 'Subtitle',
+      action: SizedBox(),
+      child: SizedBox(),
+    );
+    const section = CbsContentSection(title: 'Title', child: SizedBox());
+    expect(section.title, 'Title');
+    expect(section.subtitle, isNull);
+    expect(section.action, isNull);
+    expect(section.child, isA<SizedBox>());
+    expect(section, isA<StatelessWidget>());
+  });
 }

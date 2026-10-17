@@ -3,6 +3,7 @@ import 'sections/adaptive_collection_section.dart';
 import 'sections/application_states_section.dart';
 import 'sections/buttons_section.dart';
 import 'sections/content_card_section.dart';
+import 'sections/content_section_section.dart';
 import 'sections/feedback_section.dart';
 import 'sections/loading_section.dart';
 import 'sections/media_frame_section.dart';
@@ -64,5 +65,10 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'adaptive-collection',
     title: 'Adaptive collection',
     builder: (_) => const AdaptiveCollectionSection(),
+  ),
+  CatalogEntry(
+    id: 'content-section',
+    title: 'Content section',
+    builder: (_) => const ContentSectionSection(),
   ),
 ];

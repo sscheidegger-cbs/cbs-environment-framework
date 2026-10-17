@@ -10,6 +10,7 @@ import 'package:cbs_flutter_ux_example/catalog/catalog_keys.dart';
 import 'package:cbs_flutter_ux_example/catalog/catalog_scenario.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/adaptive_collection_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/buttons_section.dart';
+import 'package:cbs_flutter_ux_example/catalog/sections/content_section_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/feedback_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/media_frame_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/section_heading_section.dart';
@@ -57,7 +58,36 @@ const _demoIds = <String>[
   'collection-cards',
   'collection-media',
   'collection-narrow',
+  'section-title-content',
+  'section-subtitle',
+  'section-action',
+  'section-card',
+  'section-collection',
+  'section-media',
+  'section-full',
 ];
+
+/// Demonstrations of the "content-section" section, in display order.
+const _sectionDemoIds = <String>[
+  'section-title-content',
+  'section-subtitle',
+  'section-action',
+  'section-card',
+  'section-collection',
+  'section-media',
+  'section-full',
+];
+
+/// Demonstrations of the "content-section" section that show a subtitle.
+const _sectionWithSubtitle = <String>{
+  'section-subtitle',
+  'section-action',
+  'section-collection',
+  'section-full',
+};
+
+/// Demonstrations of the "content-section" section that show an action.
+const _sectionWithAction = <String>{'section-action', 'section-full'};
 
 /// Columns of the adaptive grid (default `minItemWidth` 240 and `spacing`
 /// 12) at each simulated width.
@@ -548,8 +578,15 @@ void main() {
 
       final headings = find.byType(CbsSectionHeading);
       final count = headings.evaluate().length;
+      // The headings drawn by the CbsContentSection demonstrations are
+      // counted apart: one per demonstration.
+      final sectionHeadings = inSection(
+        'content-section',
+        find.byType(CbsSectionHeading),
+      ).evaluate().length;
+      expect(sectionHeadings, _sectionDemoIds.length);
       // Panel content, three heading demos, states Empty and Ready.
-      expect(count, 6);
+      expect(count - sectionHeadings, 6);
       for (var i = 0; i < count; i++) {
         final node = tester.getSemantics(headings.at(i));
         expect(node.flagsCollection.isHeader, isTrue, reason: 'heading $i');
@@ -1257,6 +1294,355 @@ void main() {
             .first,
       );
       expect(card.color, scheme.surfaceContainerLow);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('CbsContentSection', () {
+    Finder section(String demoId) =>
+        inDemo(demoId, find.byType(CbsContentSection));
+
+    CbsContentSection widgetOf(WidgetTester tester, String demoId) =>
+        tester.widget<CbsContentSection>(section(demoId));
+
+    Finder heading(String demoId) =>
+        inDemo(demoId, find.byType(CbsSectionHeading));
+
+    /// Number of finders laid out on the same row as the first one.
+    int firstRow(WidgetTester tester, List<Finder> finders) {
+      final firstTop = tester.getTopLeft(finders.first).dy;
+      return finders
+          .where((f) => (tester.getTopLeft(f).dy - firstTop).abs() < 0.001)
+          .length;
+    }
+
+    testWidgets('is shown in its section, once per demonstration', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      expect(
+        inSection('content-section', find.byType(CbsContentSection)),
+        findsNWidgets(_sectionDemoIds.length),
+      );
+      for (final id in _sectionDemoIds) {
+        expect(section(id), findsOneWidget, reason: id);
+        expect(
+          _text(id, ContentSectionSection.sectionTitle),
+          findsOneWidget,
+          reason: id,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('draws every title with a CbsSectionHeading', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _pump(tester);
+
+      for (final id in _sectionDemoIds) {
+        expect(heading(id), findsOneWidget, reason: id);
+        expect(
+          tester.widget<CbsSectionHeading>(heading(id)).title,
+          ContentSectionSection.sectionTitle,
+          reason: id,
+        );
+        expect(
+          tester.getSemantics(heading(id)).flagsCollection.isHeader,
+          isTrue,
+          reason: id,
+        );
+      }
+      handle.dispose();
+    });
+
+    testWidgets('shows the subtitle and the action where they are given', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      for (final id in _sectionDemoIds) {
+        final widget = widgetOf(tester, id);
+        expect(
+          widget.subtitle,
+          _sectionWithSubtitle.contains(id)
+              ? ContentSectionSection.sectionSubtitle
+              : isNull,
+          reason: id,
+        );
+        expect(
+          widget.action,
+          _sectionWithAction.contains(id) ? isNotNull : isNull,
+          reason: id,
+        );
+        expect(
+          _text(id, ContentSectionSection.sectionSubtitle),
+          _sectionWithSubtitle.contains(id) ? findsOneWidget : findsNothing,
+          reason: id,
+        );
+        expect(
+          _text(id, ContentSectionSection.actionLabel),
+          _sectionWithAction.contains(id) ? findsOneWidget : findsNothing,
+          reason: id,
+        );
+      }
+    });
+
+    testWidgets('composes CbsContentCard, CbsAdaptiveCollection and '
+        'CbsMediaFrame', (tester) async {
+      await _pump(tester);
+
+      expect(
+        _text('section-title-content', ContentSectionSection.bodyText),
+        findsOneWidget,
+      );
+      expect(
+        inDemo('section-card', find.byType(CbsContentCard)),
+        findsOneWidget,
+      );
+      expect(inDemo('section-card', find.byType(CbsMediaFrame)), findsNothing);
+
+      final collection = tester.widget<CbsAdaptiveCollection>(
+        inDemo('section-collection', find.byType(CbsAdaptiveCollection)),
+      );
+      expect(collection.layout, CbsCollectionLayout.grid);
+      expect(collection.children, hasLength(ContentSectionSection.tileCount));
+
+      expect(
+        inDemo('section-media', find.byType(CbsMediaFrame)),
+        findsOneWidget,
+      );
+
+      expect(
+        inDemo('section-full', find.byType(CbsAdaptiveCollection)),
+        findsOneWidget,
+      );
+      expect(
+        inDemo('section-full', find.byType(CbsContentCard)),
+        findsNWidgets(ContentSectionSection.fullCardCount),
+      );
+    });
+
+    for (final width in CatalogWidth.values) {
+      testWidgets('fills the width at ${width.label}', (tester) async {
+        await _pump(tester, CatalogScenario(width: width));
+
+        for (final id in _sectionDemoIds) {
+          expect(
+            _size(tester, section(id)).width,
+            width.logicalPixels,
+            reason: id,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the collection and the cards adapt their columns at '
+          '${width.label}', (tester) async {
+        await _pump(tester, CatalogScenario(width: width));
+
+        final columns = _collectionColumns[width]!;
+        final tiles = [
+          for (var i = 1; i <= ContentSectionSection.tileCount; i++)
+            _text('section-collection', ContentSectionSection.tileText(i)),
+        ];
+        expect(firstRow(tester, tiles), columns);
+
+        final cards = inDemo('section-full', find.byType(CbsContentCard));
+        expect(
+          firstRow(tester, [
+            for (var i = 0; i < ContentSectionSection.fullCardCount; i++)
+              cards.at(i),
+          ]),
+          math.min(columns, ContentSectionSection.fullCardCount),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('the media keeps its 16:9 ratio inside the section', (
+      tester,
+    ) async {
+      await _pump(tester, const CatalogScenario(width: CatalogWidth.w840));
+
+      final size = _size(
+        tester,
+        inDemo('section-media', find.byType(CbsMediaFrame)),
+      );
+      expect(size.width, 840);
+      expect(size.height, closeTo(840 * 9 / 16, 0.001));
+    });
+
+    testWidgets('does not overflow at 320 px, text x2', (tester) async {
+      await _pump(tester, _narrowLargeText);
+
+      expect(tester.takeException(), isNull);
+      for (final id in _sectionDemoIds) {
+        expect(_size(tester, section(id)).width, 320, reason: id);
+      }
+    });
+
+    testWidgets('keeps the content under the header at 320 px, text x2', (
+      tester,
+    ) async {
+      await _pump(tester, _narrowLargeText);
+
+      // The simulated surface does not start at x = 0: the page padding and
+      // the frame border shift it. The edge is measured on the viewport.
+      final viewport = tester.getRect(find.byKey(CatalogKeys.previewViewport));
+      expect(viewport.width, 320);
+
+      // Demonstration -> content shown under its header.
+      final contents = <String, Finder>{
+        'section-action': _text(
+          'section-action',
+          ContentSectionSection.bodyText,
+        ),
+        'section-full': inDemo(
+          'section-full',
+          find.byType(CbsAdaptiveCollection),
+        ),
+      };
+      for (final MapEntry(key: id, value: contentFinder) in contents.entries) {
+        final action = tester.getRect(
+          _text(id, ContentSectionSection.actionLabel),
+        );
+        final subtitle = tester.getRect(
+          _text(id, ContentSectionSection.sectionSubtitle),
+        );
+        final content = tester.getRect(contentFinder);
+        expect(action.right, lessThanOrEqualTo(viewport.right), reason: id);
+        expect(action.left, greaterThanOrEqualTo(viewport.left), reason: id);
+        expect(content.top, greaterThan(subtitle.bottom), reason: id);
+        expect(content.top, greaterThan(action.bottom), reason: id);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the action reacts to taps and is visibly counted', (
+      tester,
+    ) async {
+      await _pump(tester);
+      expect(
+        counterText(tester, 'section-action'),
+        'Section action presses: 0',
+      );
+
+      final action = inDemo(
+        'section-action',
+        find.widgetWithText(TextButton, ContentSectionSection.actionLabel),
+      );
+      await tapVisible(tester, action);
+      await tapVisible(tester, action);
+
+      expect(
+        counterText(tester, 'section-action'),
+        'Section action presses: 2',
+      );
+      expect(
+        counterText(tester, 'section-full-action'),
+        'Full section action presses: 0',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the action and the cards of the complete section are '
+        'independent', (tester) async {
+      await _pump(tester, const CatalogScenario(width: CatalogWidth.w1280));
+      expect(
+        counterText(tester, 'section-full-action'),
+        'Full section action presses: 0',
+      );
+      expect(
+        counterText(tester, 'section-full-card'),
+        'Full section card taps: 0',
+      );
+
+      final cards = inDemo('section-full', find.byType(CbsContentCard));
+      await tapVisible(
+        tester,
+        find.descendant(
+          of: cards.at(0),
+          matching: find.text(ContentSectionSection.cardTitle),
+        ),
+      );
+      await tapVisible(
+        tester,
+        find.descendant(
+          of: cards.at(3),
+          matching: find.text(ContentSectionSection.cardTitle),
+        ),
+      );
+
+      expect(
+        counterText(tester, 'section-full-card'),
+        'Full section card taps: 2',
+      );
+      expect(
+        counterText(tester, 'section-full-action'),
+        'Full section action presses: 0',
+      );
+
+      await tapVisible(
+        tester,
+        inDemo(
+          'section-full',
+          find.widgetWithText(TextButton, ContentSectionSection.actionLabel),
+        ),
+      );
+
+      expect(
+        counterText(tester, 'section-full-card'),
+        'Full section card taps: 2',
+      );
+      expect(
+        counterText(tester, 'section-full-action'),
+        'Full section action presses: 1',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the counters survive scenario changes', (tester) async {
+      await _pump(tester);
+      await tapVisible(
+        tester,
+        inDemo(
+          'section-action',
+          find.widgetWithText(TextButton, ContentSectionSection.actionLabel),
+        ),
+      );
+
+      await selectOption(tester, CatalogKeys.widthOption(CatalogWidth.w840));
+      await selectOption(
+        tester,
+        CatalogKeys.designOption(CatalogDesign.branded),
+      );
+
+      expect(
+        counterText(tester, 'section-action'),
+        'Section action presses: 1',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('follows the effective theme in dark Branded', (tester) async {
+      await _pump(
+        tester,
+        const CatalogScenario(
+          design: CatalogDesign.branded,
+          appearance: CatalogAppearance.dark,
+        ),
+      );
+
+      final scheme = CbsTheme.branded(
+        primaryColor: CatalogScenario.brandedPrimaryColor,
+        buttonRadius: CbsRadius.lg,
+        brightness: Brightness.dark,
+      ).colorScheme;
+      final subtitle = tester.widget<Text>(
+        _text('section-subtitle', ContentSectionSection.sectionSubtitle),
+      );
+      expect(subtitle.style!.color, scheme.onSurfaceVariant);
       expect(tester.takeException(), isNull);
     });
   });

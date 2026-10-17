@@ -143,6 +143,7 @@ void main() {
         'content-card',
         'media-frame',
         'adaptive-collection',
+        'content-section',
       ]);
       expect(ids.toSet(), hasLength(ids.length));
     });
