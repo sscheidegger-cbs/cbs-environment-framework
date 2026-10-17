@@ -9,6 +9,7 @@ import 'package:cbs_flutter_ux_example/catalog/catalog_keys.dart';
 import 'package:cbs_flutter_ux_example/catalog/catalog_scenario.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/buttons_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/feedback_section.dart';
+import 'package:cbs_flutter_ux_example/catalog/sections/media_frame_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/section_heading_section.dart';
 import 'package:cbs_flutter_ux_example/catalog/sections/state_panel_section.dart';
 import 'package:cbs_flutter_ux_example/main.dart';
@@ -45,6 +46,10 @@ const _demoIds = <String>[
   'state-empty',
   'state-error',
   'state-ready',
+  'media-16-9',
+  'media-1-1',
+  'media-custom',
+  'media-placeholder',
 ];
 
 /// Scenario of the "narrow screen, large text" worst case.
@@ -740,6 +745,177 @@ void main() {
       expect(
         (emptyPanel.decoration as BoxDecoration).color,
         scheme.surfaceContainerHighest,
+      );
+    });
+  });
+
+  group('CbsMediaFrame', () {
+    Finder frame(String demoId) => inDemo(demoId, find.byType(CbsMediaFrame));
+
+    CbsMediaFrame widgetOf(WidgetTester tester, String demoId) =>
+        tester.widget<CbsMediaFrame>(frame(demoId));
+
+    BorderRadiusGeometry radiusOf(WidgetTester tester, String demoId) => tester
+        .widget<ClipRRect>(
+          find.descendant(of: frame(demoId), matching: find.byType(ClipRRect)),
+        )
+        .borderRadius;
+
+    testWidgets('is shown in its section, once per variant', (tester) async {
+      await _pump(tester);
+
+      expect(
+        inSection('media-frame', find.byType(CbsMediaFrame)),
+        findsNWidgets(4),
+      );
+      for (final id in [
+        'media-16-9',
+        'media-1-1',
+        'media-custom',
+        'media-placeholder',
+      ]) {
+        expect(frame(id), findsOneWidget, reason: id);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shows the 16:9, 1:1, custom and placeholder variants', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      expect(widgetOf(tester, 'media-16-9').aspectRatio, 16 / 9);
+      expect(widgetOf(tester, 'media-1-1').aspectRatio, 1);
+      expect(
+        widgetOf(tester, 'media-custom').aspectRatio,
+        MediaFrameSection.customAspectRatio,
+      );
+      expect(widgetOf(tester, 'media-placeholder').aspectRatio, 16 / 9);
+
+      expect(
+        _text('media-16-9', MediaFrameSection.ratioWideCaption),
+        findsOneWidget,
+      );
+      expect(
+        _text('media-1-1', MediaFrameSection.ratioSquareCaption),
+        findsOneWidget,
+      );
+      expect(
+        _text('media-custom', MediaFrameSection.customCaption),
+        findsOneWidget,
+      );
+      expect(
+        inDemo('media-placeholder', find.byIcon(Icons.image_outlined)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the custom variant sets its own radius and label', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      expect(
+        widgetOf(tester, 'media-custom').semanticLabel,
+        MediaFrameSection.customSemanticLabel,
+      );
+      expect(
+        radiusOf(tester, 'media-custom'),
+        BorderRadius.circular(CbsRadius.xl),
+      );
+      for (final id in ['media-16-9', 'media-1-1', 'media-placeholder']) {
+        expect(
+          radiusOf(tester, id),
+          BorderRadius.circular(CbsRadius.md),
+          reason: id,
+        );
+      }
+    });
+
+    testWidgets('exposes the semantic labels of the labelled variants', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await _pump(tester);
+
+      for (final label in [
+        MediaFrameSection.customSemanticLabel,
+        MediaFrameSection.placeholderSemanticLabel,
+      ]) {
+        expect(
+          find.bySemanticsLabel(RegExp(RegExp.escape(label))),
+          findsOneWidget,
+          reason: label,
+        );
+      }
+      handle.dispose();
+    });
+
+    for (final width in CatalogWidth.values) {
+      testWidgets('keeps its ratio at ${width.label}', (tester) async {
+        await _pump(tester, CatalogScenario(width: width));
+
+        final available = width.logicalPixels;
+        final compact = available < MediaFrameSection.compactMaxWidth
+            ? available
+            : MediaFrameSection.compactMaxWidth;
+
+        for (final id in ['media-16-9', 'media-placeholder']) {
+          final size = _size(tester, frame(id));
+          expect(size.width, available, reason: id);
+          expect(size.height, closeTo(available * 9 / 16, 0.001), reason: id);
+        }
+        expect(_size(tester, frame('media-1-1')), Size(compact, compact));
+        final custom = _size(tester, frame('media-custom'));
+        expect(custom.width, compact);
+        expect(
+          custom.height,
+          closeTo(compact / MediaFrameSection.customAspectRatio, 0.001),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('does not overflow at 320 px, text x2', (tester) async {
+      await _pump(tester, _narrowLargeText);
+
+      expect(tester.takeException(), isNull);
+      expect(_size(tester, frame('media-16-9')).width, 320);
+      expect(_size(tester, frame('media-custom')).height, closeTo(180, 0.001));
+    });
+
+    testWidgets('the placeholder uses the surface color of the theme', (
+      tester,
+    ) async {
+      await _pump(tester);
+
+      Color placeholder() => tester
+          .widget<ColoredBox>(
+            find
+                .descendant(
+                  of: frame('media-placeholder'),
+                  matching: find.byType(ColoredBox),
+                )
+                .first,
+          )
+          .color;
+
+      expect(
+        placeholder(),
+        CbsTheme.essentials().colorScheme.surfaceContainerHighest,
+      );
+
+      await selectOption(
+        tester,
+        CatalogKeys.appearanceOption(CatalogAppearance.dark),
+      );
+      await settleThemeAnimation(tester);
+
+      expect(
+        placeholder(),
+        CbsTheme.essentials(brightness: Brightness.dark)
+            .colorScheme
+            .surfaceContainerHighest,
       );
     });
   });

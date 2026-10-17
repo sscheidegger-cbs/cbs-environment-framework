@@ -4,6 +4,7 @@ import 'sections/buttons_section.dart';
 import 'sections/content_card_section.dart';
 import 'sections/feedback_section.dart';
 import 'sections/loading_section.dart';
+import 'sections/media_frame_section.dart';
 import 'sections/retry_message_section.dart';
 import 'sections/section_heading_section.dart';
 import 'sections/state_panel_section.dart';
@@ -52,5 +53,10 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'content-card',
     title: 'Content card',
     builder: (_) => const ContentCardSection(),
+  ),
+  CatalogEntry(
+    id: 'media-frame',
+    title: 'Media frame',
+    builder: (_) => const MediaFrameSection(),
   ),
 ];

@@ -77,4 +77,20 @@ void main() {
     const CbsSectionHeading(title: 'Title', key: ValueKey('heading'));
     expect(const CbsSectionHeading(title: 'Title').title, 'Title');
   });
+
+  test('exposes the D05 VP-02 addition', () {
+    // CbsMediaFrame: child required; aspectRatio, borderRadius and
+    // semanticLabel optional.
+    const CbsMediaFrame(child: SizedBox());
+    const CbsMediaFrame(
+      key: ValueKey('frame'),
+      aspectRatio: 1,
+      borderRadius: BorderRadius.zero,
+      semanticLabel: 'Media',
+      child: SizedBox(),
+    );
+    expect(const CbsMediaFrame(child: SizedBox()).aspectRatio, 16 / 9);
+    expect(const CbsMediaFrame(child: SizedBox()).borderRadius, isNull);
+    expect(const CbsMediaFrame(child: SizedBox()).semanticLabel, isNull);
+  });
 }
