@@ -144,6 +144,7 @@ void main() {
         'media-frame',
         'adaptive-collection',
         'content-section',
+        'category-selector',
       ]);
       expect(ids.toSet(), hasLength(ids.length));
     });

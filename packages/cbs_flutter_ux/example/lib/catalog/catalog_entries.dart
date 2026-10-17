@@ -2,6 +2,7 @@ import 'catalog_entry.dart';
 import 'sections/adaptive_collection_section.dart';
 import 'sections/application_states_section.dart';
 import 'sections/buttons_section.dart';
+import 'sections/category_selector_section.dart';
 import 'sections/content_card_section.dart';
 import 'sections/content_section_section.dart';
 import 'sections/feedback_section.dart';
@@ -70,5 +71,10 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'content-section',
     title: 'Content section',
     builder: (_) => const ContentSectionSection(),
+  ),
+  CatalogEntry(
+    id: 'category-selector',
+    title: 'Category selector',
+    builder: (_) => const CategorySelectorSection(),
   ),
 ];

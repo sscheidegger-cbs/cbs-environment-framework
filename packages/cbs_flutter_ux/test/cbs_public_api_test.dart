@@ -138,4 +138,52 @@ void main() {
     expect(section.child, isA<SizedBox>());
     expect(section, isA<StatelessWidget>());
   });
+
+  test('exposes the D05 VP-05 addition', () {
+    // CbsCategorySelectionMode: single and multiple, in this order.
+    expect(CbsCategorySelectionMode.values, [
+      CbsCategorySelectionMode.single,
+      CbsCategorySelectionMode.multiple,
+    ]);
+
+    // CbsCategoryOption: value and label required; enabled and
+    // semanticLabel optional.
+    const CbsCategoryOption<String>(value: 'a', label: 'A');
+    const CbsCategoryOption<int>(
+      value: 1,
+      label: 'One',
+      enabled: false,
+      semanticLabel: 'Category one',
+    );
+    const option = CbsCategoryOption<String>(value: 'a', label: 'A');
+    expect(option.value, 'a');
+    expect(option.label, 'A');
+    expect(option.enabled, isTrue);
+    expect(option.semanticLabel, isNull);
+
+    // CbsCategorySelector: options, selectedValues and onSelectionChanged
+    // required (the callback may be null); key and mode optional.
+    const CbsCategorySelector<String>(
+      options: [option],
+      selectedValues: {'a'},
+      onSelectionChanged: null,
+    );
+    CbsCategorySelector<String>(
+      key: const ValueKey('selector'),
+      options: const [option],
+      selectedValues: const {},
+      onSelectionChanged: (Set<String> values) {},
+      mode: CbsCategorySelectionMode.multiple,
+    );
+    const selector = CbsCategorySelector<String>(
+      options: [],
+      selectedValues: {},
+      onSelectionChanged: null,
+    );
+    expect(selector.mode, CbsCategorySelectionMode.single);
+    expect(selector.options, isEmpty);
+    expect(selector.selectedValues, isEmpty);
+    expect(selector.onSelectionChanged, isNull);
+    expect(selector, isA<StatelessWidget>());
+  });
 }

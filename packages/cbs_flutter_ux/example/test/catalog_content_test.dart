@@ -65,6 +65,13 @@ const _demoIds = <String>[
   'section-collection',
   'section-media',
   'section-full',
+  'category-single',
+  'category-multiple',
+  'category-disabled',
+  'category-empty',
+  'category-preselected',
+  'category-long',
+  'category-full',
 ];
 
 /// Demonstrations of the "content-section" section, in display order.
@@ -585,8 +592,15 @@ void main() {
         find.byType(CbsSectionHeading),
       ).evaluate().length;
       expect(sectionHeadings, _sectionDemoIds.length);
+      // The complete demonstration of the category selector draws one more
+      // heading, through its own CbsContentSection.
+      final categoryHeadings = inSection(
+        'category-selector',
+        find.byType(CbsSectionHeading),
+      ).evaluate().length;
+      expect(categoryHeadings, 1);
       // Panel content, three heading demos, states Empty and Ready.
-      expect(count - sectionHeadings, 6);
+      expect(count - sectionHeadings - categoryHeadings, 6);
       for (var i = 0; i < count; i++) {
         final node = tester.getSemantics(headings.at(i));
         expect(node.flagsCollection.isHeader, isTrue, reason: 'heading $i');

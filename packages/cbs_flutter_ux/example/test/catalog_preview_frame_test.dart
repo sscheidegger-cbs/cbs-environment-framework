@@ -17,10 +17,12 @@ const _android360 = Size(360, 800);
 
 /// Horizontal scroll extent of the preview, 0 when nothing scrolls.
 double _previewScrollExtent(WidgetTester tester) {
-  final scrollable = find.descendant(
-    of: find.byKey(CatalogKeys.previewScroll),
-    matching: find.byType(Scrollable),
-  );
+  final scrollable = find
+      .descendant(
+        of: find.byKey(CatalogKeys.previewScroll),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   return tester.state<ScrollableState>(scrollable).position.maxScrollExtent;
 }
 

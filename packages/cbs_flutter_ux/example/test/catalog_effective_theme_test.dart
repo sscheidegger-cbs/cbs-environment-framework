@@ -23,6 +23,7 @@ final _previewedComponents = <String, Finder>{
   'CbsRetryMessage': find.byType(CbsRetryMessage),
   'CbsSectionHeading': find.byType(CbsSectionHeading),
   'CbsContentSection': find.byType(CbsContentSection),
+  'CbsCategorySelector': find.byType(CbsCategorySelector<String>),
 };
 
 /// Theme expected for [design] and [brightness], built independently of
