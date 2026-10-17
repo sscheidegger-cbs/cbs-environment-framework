@@ -11,6 +11,7 @@ export 'src/components/visual_parts/cbs_category_selector.dart';
 export 'src/components/visual_parts/cbs_content_card.dart';
 export 'src/components/visual_parts/cbs_content_section.dart';
 export 'src/components/visual_parts/cbs_media_frame.dart';
+export 'src/components/visual_parts/cbs_search_field.dart';
 export 'src/components/visual_parts/cbs_section_heading.dart';
 export 'src/foundation/theme/cbs_feedback_style.dart';
 export 'src/foundation/theme/cbs_theme.dart';

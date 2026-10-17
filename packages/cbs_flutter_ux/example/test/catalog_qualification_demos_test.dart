@@ -775,7 +775,7 @@ void main() {
   });
 
   group('catalog completeness', () {
-    testWidgets('keeps the twelve sections and the six widgets', (
+    testWidgets('keeps the thirteen sections and the six widgets', (
       tester,
     ) async {
       await _pump(tester);
@@ -793,6 +793,7 @@ void main() {
         'adaptive-collection',
         'content-section',
         'category-selector',
+        'search-field',
       ]);
       expect(inSection('buttons', find.byType(CbsButton)), findsWidgets);
       expect(

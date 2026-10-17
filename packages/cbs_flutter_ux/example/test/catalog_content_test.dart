@@ -72,6 +72,14 @@ const _demoIds = <String>[
   'category-preselected',
   'category-long',
   'category-full',
+  'search-empty',
+  'search-interactive',
+  'search-prefilled',
+  'search-clear',
+  'search-disabled',
+  'search-submit',
+  'search-long',
+  'search-long-text',
 ];
 
 /// Demonstrations of the "content-section" section, in display order.

@@ -186,4 +186,34 @@ void main() {
     expect(selector.onSelectionChanged, isNull);
     expect(selector, isA<StatelessWidget>());
   });
+
+  test('exposes the D05 VP-06 addition', () {
+    // CbsSearchField: every parameter is optional.
+    const CbsSearchField();
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    CbsSearchField(
+      key: const ValueKey('search'),
+      controller: controller,
+      hintText: 'Search',
+      enabled: false,
+      autofocus: true,
+      onChanged: (String text) {},
+      onSubmitted: (String text) {},
+      onClear: _noop,
+      semanticLabel: 'Search the catalog',
+    );
+
+    const search = CbsSearchField();
+    expect(search.controller, isNull);
+    expect(search.hintText, isNull);
+    expect(search.enabled, isTrue);
+    expect(search.autofocus, isFalse);
+    expect(search.onChanged, isNull);
+    expect(search.onSubmitted, isNull);
+    expect(search.onClear, isNull);
+    expect(search.semanticLabel, isNull);
+    expect(search, isA<StatelessWidget>());
+    expect(search, isNot(isA<StatefulWidget>()));
+  });
 }

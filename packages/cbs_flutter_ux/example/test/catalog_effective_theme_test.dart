@@ -24,6 +24,7 @@ final _previewedComponents = <String, Finder>{
   'CbsSectionHeading': find.byType(CbsSectionHeading),
   'CbsContentSection': find.byType(CbsContentSection),
   'CbsCategorySelector': find.byType(CbsCategorySelector<String>),
+  'CbsSearchField': find.byType(CbsSearchField),
 };
 
 /// Theme expected for [design] and [brightness], built independently of

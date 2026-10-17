@@ -69,11 +69,24 @@ Finder _selectorScrollable(String demoId) =>
 
 void main() {
   group('category selector section', () {
-    testWidgets('is the last entry of the catalog, once, with its title', (
+    testWidgets('appears once before search field, with its title', (
       tester,
     ) async {
-      expect(catalogEntries.last.id, 'category-selector');
-      expect(catalogEntries.last.title, 'Category selector');
+      final categoryEntries = catalogEntries
+          .where((entry) => entry.id == 'category-selector')
+          .toList();
+
+      expect(categoryEntries, hasLength(1));
+      expect(categoryEntries.single.title, 'Category selector');
+
+      final categoryIndex = catalogEntries.indexWhere(
+        (entry) => entry.id == 'category-selector',
+      );
+      final searchIndex = catalogEntries.indexWhere(
+        (entry) => entry.id == 'search-field',
+      );
+
+      expect(searchIndex, greaterThan(categoryIndex));
 
       await _pump(tester);
 

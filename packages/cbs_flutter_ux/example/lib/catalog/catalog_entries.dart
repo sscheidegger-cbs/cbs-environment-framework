@@ -9,6 +9,7 @@ import 'sections/feedback_section.dart';
 import 'sections/loading_section.dart';
 import 'sections/media_frame_section.dart';
 import 'sections/retry_message_section.dart';
+import 'sections/search_field_section.dart';
 import 'sections/section_heading_section.dart';
 import 'sections/state_panel_section.dart';
 
@@ -76,5 +77,10 @@ final List<CatalogEntry> catalogEntries = <CatalogEntry>[
     id: 'category-selector',
     title: 'Category selector',
     builder: (_) => const CategorySelectorSection(),
+  ),
+  CatalogEntry(
+    id: 'search-field',
+    title: 'Search field',
+    builder: (_) => const SearchFieldSection(),
   ),
 ];
